@@ -1,14 +1,18 @@
 import sys
 import os
 import requests
+import zipfile
+import shutil
 from PyQt6.QtWidgets import QApplication, QMessageBox
 
 # Путь к файлу с версией
 VERSION_FILE = "version.txt"
 # URL к файлу с версией на GitHub
-GITHUB_VERSION_URL = "https://github.com/Px228-Da-Da/PxStellarOs/blob/master/version.txt"
-# URL к файлу setup.py на GitHub
-GITHUB_SETUP_URL = "https://github.com/Px228-Da-Da/PxStellarOs/blob/master/setup.py"
+GITHUB_VERSION_URL = "https://raw.githubusercontent.com/Px228-Da-Da/PxStellarOs/master/version.txt"
+# URL к ZIP-архиву репозитория
+GITHUB_ZIP_URL = "https://github.com/Px228-Da-Da/PxStellarOs/archive/refs/heads/master.zip"
+# Временная папка для распаковки
+TEMP_FOLDER = "temp_update"
 
 def get_current_version():
     """Получает текущую версию из файла version.txt."""
@@ -27,28 +31,81 @@ def get_latest_version():
         print(f"Ошибка при получении версии с GitHub: {e}")
         return None
 
-def download_file(url, destination):
-    """Скачивает файл с указанного URL и сохраняет его в destination."""
+def download_and_extract_zip(url, destination):
+    """Скачивает ZIP-архив и распаковывает его в указанную папку."""
     try:
+        # Скачиваем ZIP-архив
         response = requests.get(url)
         response.raise_for_status()
-        with open(destination, "wb") as f:
+
+        # Сохраняем ZIP-архив во временный файл
+        zip_path = os.path.join(destination, "repo.zip")
+        with open(zip_path, "wb") as f:
             f.write(response.content)
+
+        # Распаковываем ZIP-архив
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
+            zip_ref.extractall(destination)
+
+        # Удаляем ZIP-архив после распаковки
+        os.remove(zip_path)
+
         return True
     except Exception as e:
-        print(f"Ошибка при скачивании файла: {e}")
+        print(f"Ошибка при скачивании и распаковке ZIP-архива: {e}")
+        return False
+
+def update_files(source_folder, destination_folder):
+    """Обновляет файлы и папки в локальной системе."""
+    try:
+        # Удаляем старые файлы и папки (кроме временной папки)
+        for item in os.listdir(destination_folder):
+            item_path = os.path.join(destination_folder, item)
+            if item != TEMP_FOLDER:  # Пропускаем временную папку
+                if os.path.isfile(item_path) or os.path.islink(item_path):
+                    os.unlink(item_path)
+                elif os.path.isdir(item_path):
+                    shutil.rmtree(item_path)
+
+        # Копируем новые файлы и папки
+        for item in os.listdir(source_folder):
+            item_path = os.path.join(source_folder, item)
+            dest_path = os.path.join(destination_folder, item)
+            if os.path.isfile(item_path):
+                shutil.copy2(item_path, dest_path)
+            elif os.path.isdir(item_path):
+                shutil.copytree(item_path, dest_path)
+
+        return True
+    except Exception as e:
+        print(f"Ошибка при обновлении файлов: {e}")
         return False
 
 def update_application():
-    """Обновляет приложение, заменяя setup.py на новую версию."""
+    """Обновляет приложение, заменяя файлы и папки."""
     try:
-        # Скачиваем новую версию setup.py
-        if not download_file(GITHUB_SETUP_URL, "setup.py"):
+        # Создаем временную папку для распаковки
+        if not os.path.exists(TEMP_FOLDER):
+            os.makedirs(TEMP_FOLDER)
+
+        # Скачиваем и распаковываем ZIP-архив
+        if not download_and_extract_zip(GITHUB_ZIP_URL, TEMP_FOLDER):
             return False
 
-        # Скачиваем новую версию version.txt
-        if not download_file(GITHUB_VERSION_URL, "version.txt"):
+        # Путь к распакованной папке (GitHub добавляет суффикс -master)
+        extracted_folder = os.path.join(TEMP_FOLDER, "PxStellarOs-master")
+
+        # Проверяем, существует ли папка
+        if not os.path.exists(extracted_folder):
+            print(f"Ошибка: Папка {extracted_folder} не найдена после распаковки.")
             return False
+
+        # Обновляем файлы и папки
+        if not update_files(extracted_folder, os.getcwd()):
+            return False
+
+        # Удаляем временную папку после обновления
+        shutil.rmtree(TEMP_FOLDER)
 
         return True
     except Exception as e:

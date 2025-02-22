@@ -22,6 +22,14 @@ import sys
 from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout, QTextEdit, QLineEdit, QPushButton, QHBoxLayout
 from PyQt6.QtCore import QProcess
 
+import os
+import subprocess
+
+# Проверка обновлений
+updater_script = os.path.join(os.path.dirname(__file__), "updater.py")
+if os.path.exists(updater_script):
+    subprocess.run([sys.executable, updater_script])
+
 
 
 import sys

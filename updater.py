@@ -6,9 +6,9 @@ from PyQt6.QtWidgets import QApplication, QMessageBox
 # Путь к файлу с версией
 VERSION_FILE = "version.txt"
 # URL к файлу с версией на GitHub
-GITHUB_VERSION_URL = "https://raw.githubusercontent.com/ваш-репозиторий/ваш-проект/main/version.txt"
+GITHUB_VERSION_URL = "https://github.com/Px228-Da-Da/PxStellarOs/blob/master/version.txt"
 # URL к файлу setup.py на GitHub
-GITHUB_SETUP_URL = "https://raw.githubusercontent.com/ваш-репозиторий/ваш-проект/main/setup.py"
+GITHUB_SETUP_URL = "https://github.com/Px228-Da-Da/PxStellarOs/blob/master/setup.py"
 
 def get_current_version():
     """Получает текущую версию из файла version.txt."""

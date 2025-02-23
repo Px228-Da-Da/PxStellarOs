@@ -2,6 +2,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout, QWidget, QLabel, QListWidget, QStackedWidget, QPushButton, QHBoxLayout
 )
 from apps.local.init import DraggableResizableWindow  # Импортируем базовый класс окна
+from updater import get_current_version, get_latest_version, update_application  # Импортируем функции обновления
 
 class SettingsWindow(DraggableResizableWindow):
     def __init__(self, parent=None, window_name=""):
@@ -18,9 +19,7 @@ class SettingsWindow(DraggableResizableWindow):
         self.menu_list = QListWidget()
         self.menu_list.setFixedWidth(180)  # Ограничиваем ширину списка
         self.menu_list.addItem("Общие")
-        # self.menu_list.addItem("Дисплей")
-        # self.menu_list.addItem("Сеть")
-        # self.menu_list.addItem("Звук")
+        self.menu_list.addItem("Обновление системы")  # Добавляем новую вкладку
         self.menu_list.setStyleSheet(""
             "background-color: #2E2E2E; color: white; font-size: 14px;"
             "border-right: 1px solid #555; padding: 5px;"
@@ -37,26 +36,26 @@ class SettingsWindow(DraggableResizableWindow):
         general_layout.addWidget(QPushButton("Сохранить изменения"))
         self.content_area.addWidget(general_page)
 
-        # Страница "Дисплей"
-        display_page = QWidget()
-        display_layout = QVBoxLayout(display_page)
-        display_layout.addWidget(QLabel("Настройки дисплея"))
-        display_layout.addWidget(QPushButton("Изменить разрешение"))
-        self.content_area.addWidget(display_page)
+        # Страница "Обновление системы"
+        update_page = QWidget()
+        update_layout = QVBoxLayout(update_page)
 
-        # Страница "Сеть"
-        network_page = QWidget()
-        network_layout = QVBoxLayout(network_page)
-        network_layout.addWidget(QLabel("Настройки сети"))
-        network_layout.addWidget(QPushButton("Переподключиться"))
-        self.content_area.addWidget(network_page)
+        # Текущая версия
+        self.current_version_label = QLabel(f"Текущая версия: {get_current_version()}")
+        update_layout.addWidget(self.current_version_label)
 
-        # Страница "Звук"
-        sound_page = QWidget()
-        sound_layout = QVBoxLayout(sound_page)
-        sound_layout.addWidget(QLabel("Настройки звука"))
-        sound_layout.addWidget(QPushButton("Настроить громкость"))
-        self.content_area.addWidget(sound_page)
+        # Кнопка для проверки обновлений
+        self.check_update_button = QPushButton("Проверить обновления")
+        self.check_update_button.clicked.connect(self.check_for_updates)
+        update_layout.addWidget(self.check_update_button)
+
+        # Кнопка для запуска обновления
+        self.update_button = QPushButton("Обновить систему")
+        self.update_button.clicked.connect(self.run_update)
+        self.update_button.setEnabled(False)  # По умолчанию кнопка отключена
+        update_layout.addWidget(self.update_button)
+
+        self.content_area.addWidget(update_page)
 
         # Подключаем смену контента
         self.menu_list.currentRowChanged.connect(self.content_area.setCurrentIndex)
@@ -80,3 +79,21 @@ class SettingsWindow(DraggableResizableWindow):
 
         self.hide()
 
+    def check_for_updates(self):
+        """Проверяет наличие обновлений и обновляет интерфейс."""
+        latest_version = get_latest_version()
+        current_version = get_current_version()
+
+        if latest_version and latest_version > current_version:
+            self.current_version_label.setText(f"Текущая версия: {current_version}\nДоступна новая версия: {latest_version}")
+            self.update_button.setEnabled(True)  # Включаем кнопку обновления
+        else:
+            self.current_version_label.setText(f"Текущая версия: {current_version}\nОбновлений не найдено.")
+            self.update_button.setEnabled(False)  # Отключаем кнопку обновления
+
+    def run_update(self):
+        """Запускает процесс обновления."""
+        if update_application():
+            self.current_version_label.setText("Обновление завершено. Перезапустите ос.")
+        else:
+            self.current_version_label.setText("Ошибка при обновлении.")

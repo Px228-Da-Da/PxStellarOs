@@ -1,6 +1,6 @@
-from PyQt6.QtWidgets import QVBoxLayout, QWidget, QTabWidget, QPushButton, QLineEdit, QHBoxLayout, QToolBar
+from PyQt6.QtWidgets import QVBoxLayout, QWidget, QTabWidget, QPushButton, QLineEdit, QHBoxLayout
 from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage  # Добавлен импорт QWebEnginePage
+from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage, QWebEngineSettings
 from PyQt6.QtCore import QUrl, QStandardPaths
 from PyQt6.QtGui import QIcon
 from apps.local.init import DraggableResizableWindow  # Импортируем базовый класс окна
@@ -70,6 +70,13 @@ class BrowserWindow(DraggableResizableWindow):
         # Используем профиль пользователя для этой вкладки
         browser.setPage(QWebEnginePage(self.profile, browser))
         
+        # Разрешаем полноэкранный режим
+        settings = browser.settings()
+        settings.setAttribute(QWebEngineSettings.WebAttribute.FullScreenSupportEnabled, True)
+        
+        # Обрабатываем запрос на полноэкранный режим
+        browser.page().fullScreenRequested.connect(self.handle_fullscreen_request)
+        
         browser.setUrl(QUrl(url))
         self.tab_widget.addTab(browser, f"Tab {self.tab_widget.count() + 1}")
         self.tab_widget.setCurrentWidget(browser)
@@ -86,6 +93,19 @@ class BrowserWindow(DraggableResizableWindow):
 
         self.tab_widget.currentChanged.connect(connect_url_changed)
         connect_url_changed()
+
+    def handle_fullscreen_request(self, request):
+        """
+        Обрабатывает запрос на полноэкранный режим.
+        """
+        if request.toggleOn():
+            # Если запрос на включение полноэкранного режима
+            self.showFullScreen()
+            request.accept()
+        else:
+            # Если запрос на выключение полноэкранного режима
+            self.showNormal()
+            request.accept()
 
     def load_url(self):
         url = self.search_input.text()

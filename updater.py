@@ -138,7 +138,7 @@ def download_and_extract_zip(url, destination):
             zip_ref.extractall(destination)
 
         # Удаляем ZIP-архив после распаковки
-        os.remove(zip_path)
+        # os.remove(zip_path)
 
         return True
     except Exception as e:

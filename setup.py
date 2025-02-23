@@ -1,3 +1,29 @@
+import subprocess
+import sys
+
+# Функція для перевірки та установки пакунків
+def install_package(package_name):
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
+        self.reboot_system()
+    except subprocess.CalledProcessError:
+        print(f"Не вдалося встановити {package_name}")
+
+# Перевірка і установка PyQt6 та PyQt6-WebEngine
+try:
+    import PyQt6
+except ImportError:
+    install_package("PyQt6")
+
+try:
+    import PyQt6.QtWebEngineWidgets
+except ImportError:
+    install_package("PyQt6-WebEngine")
+
+
+
+
+
 from PyQt6.QtCore import QTimer, QTime, QDate
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QPushButton, QWidget, QHBoxLayout, QFrame, QLabel, QMessageBox, QStackedWidget, QMenuBar, QToolBar, QLineEdit,QTabWidget, QMenu
@@ -6,31 +32,24 @@ from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtCore import Qt, QSize, QUrl, QPoint
 from PyQt6.QtGui import QCursor, QIcon, QPixmap, QMouseEvent, QColor, QPainter, QBrush, QFont
 from PyQt6.QtWebEngineWidgets import QWebEngineView
-import sys
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import QGraphicsDropShadowEffect
 from PyQt6.QtCore import QTimer, QTime, QDate
 from PyQt6.QtGui import QAction, QFont
 from PyQt6.QtWidgets import QLabel, QMenuBar
-
-import sys
 from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout, QTextEdit, QLineEdit, QPushButton, QHBoxLayout
 from PyQt6.QtCore import QProcess
-
-
-import sys
 from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout, QTextEdit, QLineEdit, QPushButton, QHBoxLayout
 from PyQt6.QtCore import QProcess
+from PyQt6.QtWidgets import QApplication, QWidget, QProgressBar, QVBoxLayout, QLabel
+from PyQt6.QtGui import QPixmap
+from PyQt6.QtCore import Qt, QTimer
 
 import sys
 import os
 import subprocess
 
 
-
-
-import sys
-import os
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin", "sys", "class_")))
 from TerminalApp import TerminalApp
@@ -51,9 +70,7 @@ from settings_window import SettingsWindow
 from updater import UpdateDialog
 from updater import *
 
-from PyQt6.QtWidgets import QApplication, QWidget, QProgressBar, QVBoxLayout, QLabel
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import Qt, QTimer
+
 
 class SplashScreen(QWidget):
     def __init__(self, icon_path, parent=None):

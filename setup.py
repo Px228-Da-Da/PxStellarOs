@@ -730,13 +730,18 @@ class MacOSWindow(QMainWindow):
 
             # Проверяем, что window не None перед вызовом isMinimized()
             if window is not None:
-                if window.isMinimized():
-                    window.showNormal()
-                    window.activateWindow()
+                if window.minimized:  # Проверяем, свернуто ли окно
+                    window.restore_window()  # Восстанавливаем окно
                 else:
-                    window.show()
-                    window.raise_()
-                    window.activateWindow()
+                    if window.isMinimized():  # Если окно свернуто стандартным способом
+                        window.showNormal()
+                        window.activateWindow()
+                    else:
+                        # Анимация открытия окна
+                        self.animate_window_open(window)
+                        window.show()
+                        window.raise_()
+                        window.activateWindow()
 
                 self.active_window_name = window_name
                 self.update_win_menu(window_name)  # Обновляем название в меню "Win"
@@ -749,6 +754,26 @@ class MacOSWindow(QMainWindow):
                 if window_name in self.dock_buttons:
                     button, _ = self.dock_buttons[window_name]
                     button.setStyleSheet("background-color: #181818; border-radius: 8px;")  # Выделяем активную кнопку
+
+    def animate_window_open(self, window):
+        """Анимация открытия окна"""
+        # Устанавливаем начальный размер окна (очень маленький)
+        start_size = QSize(10, 10)
+        end_size = window.size()
+
+        # Устанавливаем начальный размер окна
+        window.resize(start_size)
+
+        # Создаем анимацию для изменения размера окна
+        self.animation = QPropertyAnimation(window, b"size")
+        self.animation.setDuration(150)  # Длительность анимации в миллисекундах
+        self.animation.setStartValue(start_size)
+        self.animation.setEndValue(end_size)
+        self.animation.setEasingCurve(QEasingCurve.Type.OutQuad)  # Плавное замедление в конце
+
+        # Запускаем анимацию
+        self.animation.start()
+
 
     def update_dock_indicators(self):
         """

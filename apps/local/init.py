@@ -1,6 +1,6 @@
-from PyQt6.QtCore import QTimer, QTime, QDate
+from PyQt6.QtCore import QTimer, QTime, QDate, QPropertyAnimation, QEasingCurve, QRect  # Добавлен QPropertyAnimation и QEasingCurve
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QVBoxLayout, QPushButton, QWidget, QHBoxLayout, QFrame, QLabel, QMessageBox, QStackedWidget, QMenuBar, QToolBar, QLineEdit,QTabWidget, QMenu
+    QApplication, QMainWindow, QVBoxLayout, QPushButton, QWidget, QHBoxLayout, QFrame, QLabel, QMessageBox, QStackedWidget, QMenuBar, QToolBar, QLineEdit, QTabWidget, QMenu
 )
 from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtCore import Qt, QSize, QUrl, QPoint
@@ -16,13 +16,10 @@ from PyQt6.QtWidgets import QLabel, QMenuBar
 from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout, QTextEdit, QLineEdit, QPushButton, QHBoxLayout
 from PyQt6.QtCore import QProcess
 
-
 from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout, QTextEdit, QLineEdit, QPushButton, QHBoxLayout
 from PyQt6.QtCore import QProcess
 
 import os
-
-
 
 from PyQt6.QtWidgets import QHBoxLayout, QLabel  # Убедитесь, что QLabel импортирован
 
@@ -102,15 +99,37 @@ class DraggableResizableWindow(QFrame):
         self.content_layout.setContentsMargins(8, 8, 8, 8)  # Отступы внутри content_area
         self.content_area.setLayout(self.content_layout)
 
-
     def add_title_widget(self, widget):
         """
         Добавляет виджет в заголовок окна (рядом с кнопками управления).
         """
         self.title_widgets_layout.addWidget(widget)
 
-
     def minimize_window(self):
+        """
+        Анимация сворачивания окна (вниз).
+        """
+        # Создаем анимацию для перемещения окна вниз
+        self.animation = QPropertyAnimation(self, b"geometry")
+        self.animation.setDuration(150)  # Длительность анимации в миллисекундах
+        self.animation.setEasingCurve(QEasingCurve.Type.OutQuad)  # Плавное замедление в конце
+
+        # Начальная позиция окна
+        start_rect = self.geometry()
+        # Конечная позиция окна (за пределами экрана вниз)
+        screen_height = QApplication.primaryScreen().geometry().height()
+        end_rect = QRect(start_rect.x(), screen_height, start_rect.width(), start_rect.height())
+
+        self.animation.setStartValue(start_rect)
+        self.animation.setEndValue(end_rect)
+        self.animation.finished.connect(self._on_minimize_animation_finished)  # Скрываем окно после завершения анимации
+        self.animation.start()
+
+
+    def _on_minimize_animation_finished(self):
+        """
+        Скрывает окно после завершения анимации сворачивания.
+        """
         self.hide()
         self.minimized = True
         # Обновляем заголовок меню в главном окне
@@ -119,7 +138,30 @@ class DraggableResizableWindow(QFrame):
         else:
             print("Ошибка: `parent_window` не найден или `update_win_menu` отсутствует!")
 
+
     def close_window(self):
+        """
+        Анимация закрытия окна (вверх).
+        """
+        # Создаем анимацию для перемещения окна вверх
+        self.animation = QPropertyAnimation(self, b"geometry")
+        self.animation.setDuration(150)  # Длительность анимации в миллисекундах
+        self.animation.setEasingCurve(QEasingCurve.Type.OutQuad)  # Плавное замедление в конце
+
+        # Начальная позиция окна
+        start_rect = self.geometry()
+        # Конечная позиция окна (за пределами экрана вверх)
+        end_rect = QRect(start_rect.x(), -start_rect.height(), start_rect.width(), start_rect.height())
+
+        self.animation.setStartValue(start_rect)
+        self.animation.setEndValue(end_rect)
+        self.animation.finished.connect(self._on_close_animation_finished)  # Закрываем окно после завершения анимации
+        self.animation.start()
+
+    def _on_close_animation_finished(self):
+        """
+        Закрывает окно после завершения анимации.
+        """
         window_name = None
         for name, window in self.parent().open_windows.items():
             if window == self:
@@ -139,8 +181,6 @@ class DraggableResizableWindow(QFrame):
             print("Ошибка: `parent_window` не найден или `update_win_menu` отсутствует!")
         self.setParent(None)  # Убираем родителя
         self.deleteLater()  # Удаляем объект
-
-
 
     def set_content(self, widget):
         """
@@ -166,7 +206,6 @@ class DraggableResizableWindow(QFrame):
             # Устанавливаем размеры окна с учетом панелей и отступа сверху
             available_height = screen_geometry.height() - top_bar_height - dock_height - top_offset
             self.setGeometry(screen_geometry.x(), screen_geometry.y() + top_offset, screen_geometry.width(), available_height)
-        
 
         self.raise_()  # Поднять окно на передний план
 
@@ -176,7 +215,6 @@ class DraggableResizableWindow(QFrame):
         else:
             print("Ошибка: `parent_window` не найден или `update_win_menu` отсутствует!")
 
-
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton:
             if event.pos().y() < 30:  # Захват за заголовок
@@ -185,13 +223,12 @@ class DraggableResizableWindow(QFrame):
                 self.resizing = True
 
         self.raise_()  # Поднимет окно на передний план при нажатии мыши
-        
+
         # Обновляем заголовок меню в главном окне
         if self.parent_window and hasattr(self.parent_window, "update_win_menu"):
             self.parent_window.update_win_menu(self.window_name)
         else:
             print("Ошибка: `parent_window` не найден или `update_win_menu` отсутствует!")
-
 
     def mouseMoveEvent(self, event: QMouseEvent):
         if self.old_pos and not self.resizing:
@@ -210,16 +247,43 @@ class DraggableResizableWindow(QFrame):
         else:
             print("Ошибка: `parent_window` не найден или `update_win_menu` отсутствует!")
 
-
     def mouseReleaseEvent(self, event: QMouseEvent):
         self.old_pos = None
         self.resizing = False
 
-    
     def update_win_menu(self, window_name):
         """
         Обновляет текст меню "Win" на активное окно.
         """
         self.win_menu.setTitle(window_name)
+    
+    def restore_window(self):
+        """
+        Восстанавливает окно после сворачивания.
+        """
+        if self.minimized:
+            # Показываем окно
+            self.show()
+            self.minimized = False
 
+            # Восстанавливаем позицию и размер окна
+            screen_geometry = QApplication.primaryScreen().geometry()
+            start_rect = QRect(self.x(), screen_geometry.height(), self.width(), self.height())
+            end_rect = QRect(self.x(), screen_geometry.height() // 2 - self.height() // 2, self.width(), self.height())
 
+            # Анимация восстановления окна
+            self.animation = QPropertyAnimation(self, b"geometry")
+            self.animation.setDuration(150)  # Длительность анимации в миллисекундах
+            self.animation.setEasingCurve(QEasingCurve.Type.OutQuad)  # Плавное замедление в конце
+            self.animation.setStartValue(start_rect)
+            self.animation.setEndValue(end_rect)
+            self.animation.start()
+
+    def toggle_window(self):
+        """
+        Переключает состояние окна: сворачивает или восстанавливает.
+        """
+        if self.minimized:
+            self.restore_window()
+        else:
+            self.minimize_window()

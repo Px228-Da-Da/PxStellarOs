@@ -23,7 +23,10 @@ except ImportError:
 
 
 
-
+import os
+from PyQt6.QtWidgets import QFrame, QPushButton, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QGraphicsDropShadowEffect
+from PyQt6.QtCore import QPropertyAnimation, QEasingCurve, QRect, Qt, QSize
+from PyQt6.QtGui import QIcon, QColor, QEnterEvent, QMouseEvent
 from PyQt6.QtCore import QTimer, QTime, QDate
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QPushButton, QWidget, QHBoxLayout, QFrame, QLabel, QMessageBox, QStackedWidget, QMenuBar, QToolBar, QLineEdit,QTabWidget, QMenu
@@ -70,6 +73,73 @@ from settings_window import SettingsWindow
 from updater import UpdateDialog
 from updater import *
 
+
+class JumpingButton(QPushButton):
+    def __init__(self, icon_path=None, parent=None):
+        super().__init__(parent)
+        self.animation = QPropertyAnimation(self, b"geometry")
+        self.animation.setDuration(200)
+        self.animation.setEasingCurve(QEasingCurve.Type.OutQuad)
+        self.is_animating = False
+        self.default_size = 44
+        self.setFixedSize(self.default_size, self.default_size)
+        self.original_geometry = None
+
+        if icon_path:
+            self.setIcon(QIcon(icon_path))
+            self.setIconSize(QSize(self.default_size, self.default_size))
+
+        self.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                border: none;
+                border-radius: 8px;
+                padding: 0;
+                margin: 0;
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.15);
+            }
+        """)
+
+    def enterEvent(self, event: QEnterEvent):
+        if not self.is_animating:
+            self.original_geometry = self.geometry()
+            self.animateJump(-10)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        if not self.is_animating:
+            self.animateJump(10)
+        super().leaveEvent(event)
+
+    def mousePressEvent(self, event: QMouseEvent):
+        if not self.is_animating:
+            self.animateJump(-20, True)
+        super().mousePressEvent(event)
+
+    def animateJump(self, offset, is_click=False):
+        if self.original_geometry is None:
+            self.original_geometry = self.geometry()
+
+        self.is_animating = True
+        start_rect = self.geometry()
+        end_rect = QRect(start_rect.x(), self.original_geometry.y() + offset, start_rect.width(), start_rect.height())
+        self.animation.setStartValue(start_rect)
+        self.animation.setEndValue(end_rect)
+        self.animation.finished.connect(lambda: self.resetPosition(is_click))
+        self.animation.start()
+
+    def resetPosition(self, is_click):
+        self.animation.setStartValue(self.geometry())
+        self.animation.setEndValue(self.original_geometry)
+        self.animation.finished.disconnect()
+        self.animation.finished.connect(self.onAnimationFinished)
+        self.animation.start()
+
+    def onAnimationFinished(self):
+        self.is_animating = False
+        self.animation.finished.disconnect()
 
 
 class SplashScreen(QWidget):
@@ -471,96 +541,97 @@ class MacOSWindow(QMainWindow):
             border: none;
         """)
         self.main_layout.addWidget(self.desktop)
+        
     def create_dock_panel(self):
-      """Стилизация док-панели в стиле macOS с динамическим размером"""
-      self.dock_buttons = {}
-      self.active_windows = {}
-  
-      # Создаем фрейм для док-панели
-      self.dock = QFrame()
-      
-      # Стили с эффектом тени
-      self.dock.setStyleSheet("""
-          QFrame {
-              background-color: rgba(255, 255, 255, 0.25);
-              border-radius: 16px;
-              border: 1px solid rgba(255, 255, 255, 0.3);
-              padding: 0;
-          }
-      """
-      )
-  
-      # Эффект тени
-      shadow = QGraphicsDropShadowEffect()
-      shadow.setBlurRadius(20)
-      shadow.setColor(QColor(0, 0, 0, 150))
-      shadow.setOffset(0, 4)
-      self.dock.setGraphicsEffect(shadow)
-  
-      # Настройка лэйаута
-      dock_layout = QHBoxLayout()
-      dock_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-      dock_layout.setSpacing(15)
-      dock_layout.setContentsMargins(10, 2, 10, 2)
-  
-      # Конфигурация иконок
-      icons = [
-          ("app_store", "desktop"),
-          ("safari", "browser"),
-          ("settings", "settings"),
-          ("cmd", "cmd")
-      ]
-      
-      button_size = 44  # Размер кнопки
-      dock_padding = 20  # Отступы док-панели
-      dock_spacing = 15  # Промежуток между кнопками
-      dock_width = len(icons) * (button_size + dock_spacing) + dock_padding * 2
-      self.dock.setFixedSize(dock_width, 80)  # Устанавливаем ширину док-панели
-  
-      for icon_name, window_name in icons:
-          icon_path = os.path.join("bin", "icons", "local_icons", "local_apps", icon_name, f"{icon_name}.png")
-          
-          if not os.path.exists(icon_path):
-              print(f"Ошибка: Иконка {icon_path} не найдена!")
-              continue
-  
-          btn = QPushButton()
-          btn.setFixedSize(button_size, button_size)
-          btn.setIcon(QIcon(icon_path))
-          btn.setIconSize(QSize(50, 50))
-          btn.setStyleSheet("""
-              QPushButton {
-                  background: transparent;
-                  border: none;
-                  border-radius: 8px;
-                  padding: 0;
-                  margin: 0;
-              }
-              QPushButton:hover {
-                  background: rgba(255, 255, 255, 0.15);
-              }
-          """
-          )
-          btn.clicked.connect(lambda _, n=window_name: self.switch_window(n))
-          
-          indicator = QLabel()
-          indicator.setFixedSize(20, 4)
-          indicator.setStyleSheet("background: transparent; border: none; border-radius: 2px;")
-          
-          container = QVBoxLayout()
-          container.setContentsMargins(0, 0, 0, 0)
-          container.setSpacing(5)
-          container.addWidget(btn, alignment=Qt.AlignmentFlag.AlignCenter)
-          container.addWidget(indicator, alignment=Qt.AlignmentFlag.AlignHCenter)
-          
-          widget = QWidget()
-          widget.setLayout(container)
-          dock_layout.addWidget(widget)
-  
-          self.dock_buttons[window_name] = (btn, indicator)
-  
-      self.dock.setLayout(dock_layout)
-      self.main_layout.addWidget(self.dock, alignment=Qt.AlignmentFlag.AlignHCenter)
+        """Стилизация док-панели в стиле macOS с динамическим размером"""
+        self.dock_buttons = {}
+        self.active_windows = {}
+
+        # Создаем фрейм для док-панели
+        self.dock = QFrame()
+
+        # Стили с эффектом тени
+        self.dock.setStyleSheet("""
+            QFrame {
+                background-color: rgba(255, 255, 255, 0.25);
+                border-radius: 16px;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                padding: 0;
+            }
+        """)
+
+        # Эффект тени
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(20)
+        shadow.setColor(QColor(0, 0, 0, 150))
+        shadow.setOffset(0, 4)
+        self.dock.setGraphicsEffect(shadow)
+
+        # Настройка лэйаута
+        dock_layout = QHBoxLayout()
+        dock_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        dock_layout.setSpacing(15)
+        dock_layout.setContentsMargins(10, 2, 10, 2)
+
+        # Конфигурация иконок
+        icons = [
+            ("app_store", "desktop"),
+            ("safari", "browser"),
+            ("settings", "settings"),
+            ("cmd", "cmd")
+        ]
+
+        button_size = 44  # Размер кнопки
+        dock_padding = 20  # Отступы док-панели
+        dock_spacing = 15  # Промежуток между кнопками
+        dock_width = len(icons) * (button_size + dock_spacing) + dock_padding * 2
+        self.dock.setFixedSize(dock_width, 65)  # Устанавливаем ширину док-панели
+
+        for icon_name, window_name in icons:
+            icon_path = os.path.join("bin", "icons", "local_icons", "local_apps", icon_name, f"{icon_name}.png")
+
+            if not os.path.exists(icon_path):
+                print(f"Ошибка: Иконка {icon_path} не найдена!")
+                continue
+
+            btn = JumpingButton(icon_path=icon_path, parent=self)
+            btn.setFixedSize(button_size, button_size)
+            btn.setIconSize(QSize(50, 50))
+            btn.clicked.connect(lambda _, n=window_name: self.switch_window(n))
+
+            # Добавляем эффект тени для кнопки
+            btn_shadow = QGraphicsDropShadowEffect()
+            btn_shadow.setBlurRadius(10)
+            btn_shadow.setColor(QColor(0, 0, 0, 100))
+            btn_shadow.setOffset(2, 2)
+            btn.setGraphicsEffect(btn_shadow)
+
+            indicator = QLabel()
+            indicator.setFixedSize(20, 4)
+            indicator.setStyleSheet("background: transparent; border: none; border-radius: 2px;")
+
+            # Контейнер для кнопки и индикатора
+            container = QWidget()  # Создаем контейнерный виджет
+            container_layout = QVBoxLayout(container)
+            container_layout.setContentsMargins(0, 8, 0, 0)
+            container_layout.setSpacing(5)
+            container_layout.addWidget(btn, alignment=Qt.AlignmentFlag.AlignCenter)
+            container_layout.addWidget(indicator, alignment=Qt.AlignmentFlag.AlignHCenter)
+
+            # Поднимаем кнопку на верхний слой
+            btn.raise_()
+
+            # Добавляем контейнер в док-панель
+            dock_layout.addWidget(container)
+
+            self.dock_buttons[window_name] = (btn, indicator)
+
+        self.dock.setLayout(dock_layout)
+        self.main_layout.addWidget(self.dock, alignment=Qt.AlignmentFlag.AlignHCenter)
+
+
+
+
 
 
     def resizeEvent(self, event):

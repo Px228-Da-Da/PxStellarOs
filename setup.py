@@ -394,7 +394,7 @@ class MacOSWindow(QMainWindow):
         self.button1.setIcon(QIcon(os.path.join("bin", "icons", "local_icons", "IconOs", "shutdown.png")))  # Иконка кнопки
         self.button1.setIconSize(QSize(30, 30))  # Размер иконки
         self.button1.setFixedSize(120, 40)  # Размер кнопки (ширина, высота)
-        self.button1.triggered.connect(self.shutdown_system)
+        self.button1.clicked.connect(self.shutdown_system)  # Используем clicked.connect
         self.button1.setStyleSheet("""
             QPushButton {
                 background: transparent;
@@ -418,7 +418,7 @@ class MacOSWindow(QMainWindow):
         self.button2.setIcon(QIcon(os.path.join("bin", "icons", "local_icons", "IconOs", "reboot.png")))  # Иконка кнопки
         self.button2.setIconSize(QSize(30, 30))  # Размер иконки
         self.button2.setFixedSize(120, 40)  # Размер кнопки (ширина, высота)
-        self.button2.triggered.connect(self.reboot_system)
+        self.button2.clicked.connect(self.reboot_system)  # Используем clicked.connect
         self.button2.setStyleSheet("""
             QPushButton {
                 background: transparent;

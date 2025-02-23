@@ -209,8 +209,8 @@ class MacOSWindow(QMainWindow):
 
         if update_application():
             print("Обновление завершено. Перезапустите приложение.")
-            # sys.exit(0)
-            self.reboot_system()
+            sys.exit(0)
+            # self.reboot_system()
         else:
             print("Ошибка при обновлении.")
 

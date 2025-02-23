@@ -146,30 +146,34 @@ def download_and_extract_zip(url, destination):
         return False
 
 def update_files(source_folder, destination_folder):
-    """Обновляет файлы и папки в локальной системе."""
+    """Обновляет только определенные файлы и папки в локальной системе."""
     try:
-        # Удаляем старые файлы и папки (кроме временной папки)
-        for item in os.listdir(destination_folder):
+        files_to_update = ["apps", "bin", "root", "version.txt", "updater.py", "setup.py"]
+
+        # Удаляем только указанные файлы и папки
+        for item in files_to_update:
             item_path = os.path.join(destination_folder, item)
-            if item != TEMP_FOLDER:  # Пропускаем временную папку
+            if os.path.exists(item_path):
                 if os.path.isfile(item_path) or os.path.islink(item_path):
                     os.unlink(item_path)
                 elif os.path.isdir(item_path):
                     shutil.rmtree(item_path)
 
-        # Копируем новые файлы и папки
-        for item in os.listdir(source_folder):
+        # Копируем только новые файлы и папки, если они есть в исходной папке
+        for item in files_to_update:
             item_path = os.path.join(source_folder, item)
             dest_path = os.path.join(destination_folder, item)
-            if os.path.isfile(item_path):
-                shutil.copy2(item_path, dest_path)
-            elif os.path.isdir(item_path):
-                shutil.copytree(item_path, dest_path)
+            if os.path.exists(item_path):
+                if os.path.isfile(item_path):
+                    shutil.copy2(item_path, dest_path)
+                elif os.path.isdir(item_path):
+                    shutil.copytree(item_path, dest_path)
 
         return True
     except Exception as e:
         print(f"Ошибка при обновлении файлов: {e}")
         return False
+
 
 def update_application():
     """Обновляет приложение, заменяя файлы и папки."""

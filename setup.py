@@ -228,6 +228,8 @@ from PyQt6.QtCore import Qt, QPropertyAnimation, QRect, QTimer
 class MacOSWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.is_locked = False  # Флаг для отслеживания состояния блокировки
+        self.is_splash_screen_active = False  # Флаг для отслеживания состояния загрузочного экрана
         try:
             self.desk_config = "root/user/desk/desk.config"
             self.active_windows = {}
@@ -294,7 +296,13 @@ class MacOSWindow(QMainWindow):
 
 
     def create_lock_screen(self):
-        # Создаем виджет для экрана блокировки
+        """Создает экран блокировки."""
+        self.is_locked = True  # Устанавливаем флаг блокировки
+        # Если lock_widget уже существует, удаляем его
+        if hasattr(self, 'lock_widget') and self.lock_widget is not None:
+            self.lock_widget = None
+
+        # Создаем новый виджет для экрана блокировки
         self.lock_widget = QWidget(self)
         self.lock_widget.setGeometry(0, 0, self.width(), self.height())
 
@@ -307,18 +315,13 @@ class MacOSWindow(QMainWindow):
         # Логотип
         icon_dir_path = os.path.join("bin", "icons", "local_icons", "IconOs", "OS.png")
         logo_pixmap = QPixmap(icon_dir_path)
-
-        # Уменьшаем размер изображения логотипа (например, в 2 раза)
-        new_width = logo_pixmap.width() // 2
-        new_height = logo_pixmap.height() // 2
-        scaled_pixmap = logo_pixmap.scaled(new_width, new_height, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-
+        scaled_pixmap = logo_pixmap.scaled(logo_pixmap.width() // 2, logo_pixmap.height() // 2, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         logo_label = QLabel(self.lock_widget)
         logo_label.setPixmap(scaled_pixmap)
         logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         logo_label.setGeometry(
             (self.width() - scaled_pixmap.width()) // 2,
-            (self.height() - scaled_pixmap.height()) // 2 - 50,  # Сдвигаем логотип выше, чтобы освободить место для поля ввода пароля
+            (self.height() - scaled_pixmap.height()) // 2 - 50,
             scaled_pixmap.width(),
             scaled_pixmap.height()
         )
@@ -326,36 +329,153 @@ class MacOSWindow(QMainWindow):
         # Поле ввода пароля
         self.password_input = QLineEdit(self.lock_widget)
         self.password_input.setGeometry(
-            (self.width() - 200) // 2,  # Центрируем поле ввода по горизонтали
-            logo_label.y() + logo_label.height() + 20,  # Размещаем поле ввода под логотипом
-            200,  # Ширина поля ввода
-            30    # Высота поля ввода
+            (self.width() - 200) // 2,
+            logo_label.y() + logo_label.height() + 20,
+            200,
+            30
         )
         self.password_input.setPlaceholderText("Password")
-        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)  # Скрываем вводимые символы
-
-        # Устанавливаем стиль для поля ввода
+        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.password_input.setStyleSheet("""
             QLineEdit {
-                border: 2px solid #555;  /* Граница поля ввода */
-                border-radius: 5px;      /* Закругленные углы */
-                padding: 5px;           /* Внутренний отступ */
-                background-color: rgba(0, 0, 0, 150);  /* Полупрозрачный черный фон */
-                color: white;           /* Цвет текста */
-                font-size: 14px;        /* Размер шрифта */
+                border: 2px solid #555;
+                border-radius: 5px;
+                padding: 5px;
+                background-color: rgba(0, 0, 0, 150);
+                color: white;
+                font-size: 14px;
             }
             QLineEdit:focus {
-                border: 2px solid #0078D7;  /* Граница при фокусе */
+                border: 2px solid #0078D7;
             }
         """)
-        self.password_input.returnPressed.connect(self.unlock_screen)  # Обработка нажатия Enter
-
-        # Активируем поле ввода пароля
+        self.password_input.returnPressed.connect(self.unlock_screen)
         self.password_input.setFocus()
+
+        # Добавляем кнопку с картинкой 50x50
+        self.main_button = QPushButton(self.lock_widget)
+        self.main_button.setIcon(QIcon(os.path.join("bin", "icons", "local_icons", "IconOs", "shutdown.png")))  # Укажите путь к изображению
+        self.main_button.setIconSize(QSize(50, 50))
+        self.main_button.setFixedSize(50, 50)
+        self.main_button.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                border: none;
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.1);
+            }
+        """)
+        self.main_button.move((self.width() - 50) // 2, logo_label.y() + logo_label.height() + 80)
+        self.main_button.clicked.connect(self.toggle_additional_buttons)
+
+        # Контейнер для дополнительных кнопок
+        self.additional_buttons_container = QWidget(self.lock_widget)
+        self.additional_buttons_container.setGeometry(
+            (self.width() - 150) // 2,  # Центрируем по горизонтали
+            self.main_button.y() - 60,  # Размещаем выше основной кнопки
+            150,  # Ширина контейнера
+            100   # Высота контейнера
+        )
+        self.additional_buttons_container.setStyleSheet("""
+            background: rgba(0, 0, 0, 150); 
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);  /* Обводка контейнера */
+        """)
+        self.additional_buttons_container.hide()  # Скрываем контейнер по умолчанию
+
+        # Вертикальный лэйаут для дополнительных кнопок
+        additional_layout = QVBoxLayout(self.additional_buttons_container)
+        additional_layout.setSpacing(10)
+        additional_layout.setContentsMargins(10, 10, 10, 10)
+
+        # Первая дополнительная кнопка
+        self.button1 = QPushButton("Shutdown", self)  # Текст кнопки
+        self.button1.setIcon(QIcon(os.path.join("bin", "icons", "local_icons", "IconOs", "shutdown.png")))  # Иконка кнопки
+        self.button1.setIconSize(QSize(30, 30))  # Размер иконки
+        self.button1.setFixedSize(120, 40)  # Размер кнопки (ширина, высота)
+        self.button1.triggered.connect(self.shutdown_system)
+        self.button1.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                border: 1px solid rgba(255, 255, 255, 0.2);  /* Обводка кнопки */
+                color: white;  /* Белый цвет текста */
+                font-size: 14px;  /* Размер шрифта */
+                padding-left: 10px;  /* Отступ слева для текста */
+                text-align: left;  /* Выравнивание текста по левому краю */
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.1);  /* Фон при наведении */
+            }
+            QPushButton::icon {
+                color: white;  /* Белый цвет иконки */
+            }
+        """)
+        additional_layout.addWidget(self.button1)  # Добавляем кнопку в лэйаут
+
+        # Вторая дополнительная кнопка
+        self.button2 = QPushButton("Reboot", self)  # Текст кнопки
+        self.button2.setIcon(QIcon(os.path.join("bin", "icons", "local_icons", "IconOs", "reboot.png")))  # Иконка кнопки
+        self.button2.setIconSize(QSize(30, 30))  # Размер иконки
+        self.button2.setFixedSize(120, 40)  # Размер кнопки (ширина, высота)
+        self.button2.triggered.connect(self.reboot_system)
+        self.button2.setStyleSheet("""
+            QPushButton {
+                background: transparent;
+                border: 1px solid rgba(255, 255, 255, 0.2);  /* Обводка кнопки */
+                color: white;  /* Белый цвет текста */
+                font-size: 14px;  /* Размер шрифта */
+                padding-left: 10px;  /* Отступ слева для текста */
+                text-align: left;  /* Выравнивание текста по левому краю */
+            }
+            QPushButton:hover {
+                background: rgba(255, 255, 255, 0.1);  /* Фон при наведении */
+            }
+            QPushButton::icon {
+                color: white;  /* Белый цвет иконки */
+            }
+        """)
+        additional_layout.addWidget(self.button2)  # Добавляем кнопку в лэйаут
+
+        # Обработчики событий для скрытия/показа контейнера
+        self.additional_buttons_container.enterEvent = self.additional_buttons_enter_event
+        self.additional_buttons_container.leaveEvent = self.additional_buttons_leave_event
+
+    def additional_buttons_enter_event(self, event):
+        """Обработчик события, когда курсор входит в область контейнера."""
+        # Ничего не делаем, контейнер остается видимым
+        pass
+
+    def additional_buttons_leave_event(self, event):
+        """Обработчик события, когда курсор покидает область контейнера."""
+        # Скрываем контейнер с анимацией
+        self.animate_container(self.additional_buttons_container, 0)
+
+    def toggle_additional_buttons(self):
+        """Показывает или скрывает дополнительные кнопки."""
+        if self.additional_buttons_container.isVisible():
+            # Анимация скрытия
+            self.animate_container(self.additional_buttons_container, 0)
+        else:
+            # Анимация появления
+            self.additional_buttons_container.show()
+            self.animate_container(self.additional_buttons_container, 1)
+
+    def animate_container(self, widget, opacity):
+        """Анимация изменения прозрачности контейнера."""
+        self.animation = QPropertyAnimation(widget, b"windowOpacity")
+        self.animation.setDuration(200)  # Длительность анимации 200 мс
+        self.animation.setStartValue(widget.windowOpacity())
+        self.animation.setEndValue(opacity)
+        if opacity == 0:
+            self.animation.finished.connect(lambda: widget.hide())  # Скрываем виджет после завершения анимации
+        self.animation.start()
+
 
     def unlock_screen(self):
         # Проверяем пароль (например, пароль "0000")
         if self.password_input.text() == "":
+            self.is_locked = False  # Снимаем флаг блокировки
             # Запускаем анимацию разблокировки
             self.animation = QPropertyAnimation(self.lock_widget, b"geometry")
             self.animation.setDuration(200)  # Длительность анимации 0.5 секунды
@@ -368,14 +488,9 @@ class MacOSWindow(QMainWindow):
             # Показываем сообщение об ошибке
             QMessageBox.warning(self, "Error", "Incorrect password!")
 
-    def keyPressEvent(self, event):
-        # Обработка нажатия клавиши Enter
-        if event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
-            self.unlock_screen()
-        else:
-            super().keyPressEvent(event)
 
     def create_splash_screen(self):
+        self.is_splash_screen_active = True  # Устанавливаем флаг загрузочного экрана
         # Создаем виджет для черного экрана
         self.splash_widget = QWidget(self)
         self.splash_widget.setGeometry(0, 0, self.width(), self.height())
@@ -443,6 +558,7 @@ class MacOSWindow(QMainWindow):
             self.progress_timer.stop()  # Останавливаем таймер, когда прогресс-бар достигнет 100%
 
     def start_animation(self):
+        self.is_splash_screen_active = False  # Снимаем флаг загрузочного экрана
         # Анимация исчезания вверх
         self.animation = QPropertyAnimation(self.splash_widget, b"geometry")
         self.animation.setDuration(200)  # Длительность анимации 1 секунда
@@ -520,10 +636,6 @@ class MacOSWindow(QMainWindow):
         except Exception as e:
             print(f"Ошибка загрузки фона: {e}")
 
-    
-    def keyPressEvent(self, event: QKeyEvent):
-        if event.key() == Qt.Key.Key_Tab and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-            self.switch_to_next_window()
 
     def switch_to_next_window(self):
         """Переключение между активными окнами"""
@@ -641,21 +753,56 @@ class MacOSWindow(QMainWindow):
 
         # Добавление времени в правый угол меню
         menubar.setCornerWidget(self.time_label, Qt.Corner.TopRightCorner)
+    
+    def keyPressEvent(self, event: QKeyEvent):
+        # Игнорируем все события клавиатуры, если экран блокировки или загрузочный экран активен
+        if self.is_locked or self.is_splash_screen_active:
+            return
+
+        # Обработка нажатия Ctrl + L для блокировки экрана
+        if event.key() == Qt.Key.Key_L and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            self.lock_screen()
+        
+        # Обработка нажатия Ctrl + Tab для переключения между окнами
+        if event.key() == Qt.Key.Key_Tab and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            self.switch_to_next_window()
+        
+        # Обработка нажатия Enter для разблокировки экрана
+        if event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
+            self.unlock_screen()
+        
+        super().keyPressEvent(event)
+
+    
+    def create_window_switch_menu(self):
+        """Создает меню для переключения между открытыми окнами."""
+        self.window_switch_menu = QMenu(self)
+        
+        # Получаем список открытых окон
+        open_windows = [name for name, win in self.open_windows.items() if win and not win.isHidden()]
+        
+        # Добавляем пункты меню для каждого открытого окна
+        for window_name in open_windows:
+            action = QAction(window_name.capitalize(), self)
+            action.triggered.connect(lambda _, name=window_name: self.switch_window(name))
+            self.window_switch_menu.addAction(action)
+        
+        # Показываем меню в центре экрана
+        self.window_switch_menu.popup(QPoint(self.width() // 2, self.height() // 2))
 
     def lock_screen(self):
         """Блокирует экран."""
         # Скрываем рабочий стол и док-панель
-        self.centralWidget().hide()
-        if hasattr(self, 'dock_panel'):
-            self.dock_panel.hide()
+        self.create_lock_screen()
 
-        # Создаем экран блокировки, если он еще не создан
-        if not hasattr(self, 'lock_widget'):
+        # Создаем экран блокировки, если он еще не создан или был удален
+        if not hasattr(self, 'lock_widget') or self.lock_widget is None:
             self.create_lock_screen()
 
         # Показываем экран блокировки
-        # self.lock_widget.show()
-        # self.password_input.setFocus()  # Активируем поле ввода пароля
+        if self.lock_widget is not None:
+            self.lock_widget.show()
+            self.password_input.setFocus()  # Активируем поле ввода пароля
 
         
     def shutdown_system(self):

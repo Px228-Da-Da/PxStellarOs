@@ -3,7 +3,11 @@ import os
 import requests
 import zipfile
 import shutil
-from PyQt6.QtWidgets import QApplication, QMessageBox
+from PyQt6.QtWidgets import QApplication, QMessageBox, QDialog, QVBoxLayout, QLabel, QPushButton, QProgressBar
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QColor, QPainter, QBrush, QFont
+
+from apps.local.init import DraggableResizableWindow
 
 # Путь к файлу с версией
 VERSION_FILE = "version.txt"
@@ -13,6 +17,92 @@ GITHUB_VERSION_URL = "https://raw.githubusercontent.com/Px228-Da-Da/PxStellarOs/
 GITHUB_ZIP_URL = "https://github.com/Px228-Da-Da/PxStellarOs/archive/refs/heads/master.zip"
 # Временная папка для распаковки
 TEMP_FOLDER = "temp_update"
+
+class UpdateDialog(QDialog):
+    def __init__(self, current_version, latest_version, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Обновление")
+        self.setFixedSize(300, 150)
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+
+        # **Переконайтеся, що немає попереднього layout**
+        if self.layout():
+            QVBoxLayout().addWidget(QLabel())  # Тимчасовий пустий layout
+            self.setLayout(None)
+
+        layout = QVBoxLayout(self)  # Новий layout
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        # Текст
+        self.label = QLabel(f"Доступна новая версия: {latest_version}\nТекущая версия: {current_version}")
+        self.label.setFont(QFont("Arial", 12))
+        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label)
+
+        # Кнопки
+        self.update_button = QPushButton("Обновиться")
+        self.update_button.clicked.connect(self.start_update)  # Запускаем обновление
+        layout.addWidget(self.update_button)
+
+        self.later_button = QPushButton("Позже")
+        self.later_button.clicked.connect(self.reject)  # Важливо!
+        layout.addWidget(self.later_button)
+
+
+    def start_update(self):
+        """Запуск обновления"""
+        self.accept()  # Закрываем окно диалога
+        
+        parent = self.parent()
+        if parent and hasattr(parent, "run_update"):
+            parent.run_update()  # Запускаем обновление из главного окна
+        else:
+            print("Ошибка: run_update() не найден в родительском объекте.")
+
+
+
+    def paintEvent(self, event):
+        """Отрисовка закруглённых углов."""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setBrush(QBrush(QColor(255, 255, 255)))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(self.rect(), 15, 15)
+
+class UpdateProgressDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Обновление")
+        self.setFixedSize(300, 150)
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        # Текст с информацией о процессе обновления
+        self.label = QLabel("Обновление ОС...")
+        self.label.setFont(QFont("Arial", 12))
+        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.label)
+
+        # Прогресс-бар
+        self.progress_bar = QProgressBar(self)
+        self.progress_bar.setRange(0, 100)
+        layout.addWidget(self.progress_bar)
+
+    def paintEvent(self, event):
+        """Отрисовка закруглённых углов."""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setBrush(QBrush(QColor(255, 255, 255)))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(self.rect(), 15, 15)
+
+    def update_progress(self, value):
+        """Обновляет прогресс-бар."""
+        self.progress_bar.setValue(value)
 
 def get_current_version():
     """Получает текущую версию из файла version.txt."""
@@ -112,39 +202,34 @@ def update_application():
         print(f"Ошибка при обновлении приложения: {e}")
         return False
 
-def ask_for_update(current_version, latest_version):
-    """Спрашивает пользователя, хочет ли он обновиться."""
-    app = QApplication(sys.argv)
-    msg = QMessageBox()
-    msg.setIcon(QMessageBox.Icon.Question)
-    msg.setText(f"Доступна новая версия: {latest_version}\nТекущая версия: {current_version}\nХотите обновиться?")
-    msg.setWindowTitle("Обновление")
-    msg.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-    return msg.exec() == QMessageBox.StandardButton.Yes
-
-def main():
-    # Получаем текущую и последнюю версии
+def check_for_updates():
+    """Проверяет наличие обновлений и предлагает пользователю обновиться."""
     current_version = get_current_version()
     latest_version = get_latest_version()
 
-    if not latest_version:
-        print("Не удалось получить информацию о новой версии.")
-        return
+    if latest_version and latest_version > current_version:
+        app = QApplication(sys.argv)
+        dialog = UpdateDialog(current_version, latest_version)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            # Пользователь согласился на обновление
+            progress_dialog = UpdateProgressDialog()
+            progress_dialog.show()
 
-    if latest_version > current_version:
-        print(f"Доступна новая версия: {latest_version}")
-        if ask_for_update(current_version, latest_version):
-            print("Начинаем обновление...")
+            # Имитация процесса обновления
+            for i in range(0, 101, 10):
+                QTimer.singleShot(i * 100, lambda i=i: progress_dialog.update_progress(i))
+                QApplication.processEvents()
+
+            # Закрываем прогресс-бар после завершения
+            progress_dialog.close()
+
+            # Запускаем процесс обновления
             if update_application():
                 print("Обновление завершено. Перезапустите приложение.")
-                # Закрываем текущее приложение
                 sys.exit(0)
             else:
                 print("Ошибка при обновлении.")
-        else:
-            print("Обновление отменено пользователем.")
-    else:
-        print("У вас установлена последняя версия.")
 
 if __name__ == "__main__":
-    main()
+    print("Запуск приложения...")
+    check_for_updates()

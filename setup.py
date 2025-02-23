@@ -22,13 +22,10 @@ import sys
 from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout, QTextEdit, QLineEdit, QPushButton, QHBoxLayout
 from PyQt6.QtCore import QProcess
 
+import sys
 import os
 import subprocess
 
-# Проверка обновлений
-updater_script = os.path.join(os.path.dirname(__file__), "updater.py")
-if os.path.exists(updater_script):
-    subprocess.run([sys.executable, updater_script])
 
 
 
@@ -36,11 +33,10 @@ import sys
 import os
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin", "sys", "class_")))
-
 from TerminalApp import TerminalApp
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "apps", "local")))
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "apps", "local")))
 from init import DraggableResizableWindow
 
 
@@ -51,6 +47,9 @@ icon_dir_PATH = os.path.join("bin", "icons", "local_icons", "IconOs", f"OS.png")
 from cmd_window import CmdWindow
 from browser_window import BrowserWindow
 from settings_window import SettingsWindow
+
+from updater import UpdateDialog
+from updater import *
 
 from PyQt6.QtWidgets import QApplication, QWidget, QProgressBar, QVBoxLayout, QLabel
 from PyQt6.QtGui import QPixmap
@@ -113,6 +112,11 @@ class SplashScreen(QWidget):
             self.timer.stop()
             self.close()
 import platform  # Добавьте этот импорт
+
+
+
+
+
 class MacOSWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -163,6 +167,56 @@ class MacOSWindow(QMainWindow):
         self.create_menu()
         self.open_windows = {}
         self.create_all_windows()
+        self.check_for_updates()
+
+    def check_for_updates(self):
+        """Проверяет наличие обновлений и показывает окно обновления."""
+        current_version = get_current_version()
+        latest_version = get_latest_version()
+
+        if latest_version and latest_version > current_version:
+            self.update_window = UpdateDialog(current_version, latest_version, self)
+            self.update_window.show()
+    
+    def run_update(self):
+        """Запускает процесс обновления."""
+        progress_dialog = UpdateProgressDialog(self)
+        progress_dialog.show()
+
+        # Имитация процесса обновления
+        for i in range(0, 101, 10):
+            QTimer.singleShot(i * 100, lambda i=i: progress_dialog.update_progress(i))
+            QApplication.processEvents()
+
+        progress_dialog.close()  # Закрываем прогресс-бар
+
+        if update_application():
+            print("Обновление завершено. Перезапустите приложение.")
+            # sys.exit(0)
+            self.reboot_system()
+        else:
+            print("Ошибка при обновлении.")
+
+
+    def start_update_process(self):
+        """Запускает процесс обновления."""
+        progress_dialog = UpdateProgressDialog(self)
+        progress_dialog.show()
+
+        # Имитация процесса обновления
+        for i in range(0, 101, 10):
+            QTimer.singleShot(i * 100, lambda i=i: progress_dialog.update_progress(i))
+            QApplication.processEvents()
+
+        # Закрываем прогресс-бар после завершения
+        progress_dialog.close()
+
+        # Запускаем процесс обновления
+        if update_application():
+            print("Обновление завершено. Перезапустите приложение.")
+            sys.exit(0)
+        else:
+            print("Ошибка при обновлении.")
     
 
     def load_background_image(self):
@@ -647,5 +701,6 @@ if __name__ == "__main__":
 
     # Показываем основное окно после завершения загрузки
     window.show()
+    # check_for_updates()
 
     sys.exit(app.exec())

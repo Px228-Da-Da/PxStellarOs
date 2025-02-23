@@ -140,90 +140,318 @@ class JumpingButton(QPushButton):
         self.is_animating = False
         self.animation.finished.disconnect()
 
+class DeathScreen(QWidget):
+    def __init__(self, parent=None, error_message="Unknown error"):
+        super().__init__(parent)
+        self.setGeometry(0, 0, parent.width(), parent.height())
+        self.setStyleSheet("background-color: black; color: white;")
+        
+        # Основной лэйаут
+        layout = QVBoxLayout()
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        # Сообщение об ошибке
+        self.error_label = QLabel(f"Your OS ran into a problem and needs to restart.\n\nError: {error_message}")
+        self.error_label.setFont(QFont("Arial", 16))
+        self.error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.error_label)
+        
+        # Кнопка для перезагрузки
+        self.reboot_button = QPushButton("Reboot Now")
+        self.reboot_button.setFont(QFont("Arial", 14))
+        self.reboot_button.setStyleSheet("""
+            QPushButton {
+                background-color: #0078D7;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #005BB5;
+            }
+        """)
+        self.reboot_button.clicked.connect(self.reboot_system)
+        layout.addWidget(self.reboot_button, alignment=Qt.AlignmentFlag.AlignCenter)
+        
+        self.setLayout(layout)
+        
+        # Анимация появления экрана смерти
+        self.animation = QPropertyAnimation(self, b"geometry")
+        self.animation.setDuration(1000)
+        self.animation.setStartValue(QRect(0, -self.height(), self.width(), self.height()))
+        self.animation.setEndValue(QRect(0, 0, self.width(), self.height()))
+        self.animation.start()
+    
+    def reboot_system(self):
+        """Перезагружает систему."""
+        system_platform = platform.system()
+        if system_platform == "Windows":
+            # Команда для перезагрузки Windows
+            QProcess.startDetached("shutdown", ["/r", "/t", "0"])
+        elif system_platform == "Linux":
+            # Команда для перезагрузки Linux
+            QProcess.startDetached("reboot")
+        else:
+            print(f"Unsupported platform: {system_platform}")
 
-# Шлях до іконки
-icon_dir_PATH = os.path.join("bin", "icons", "local_icons", "IconOs", "OS.png")
+import traceback
 
-class SplashScreen(QWidget):
-    def __init__(self):
-        super().__init__()
 
-        # Налаштування вікна SplashScreen
-        self.setWindowTitle("Завантаження...")
-        self.setStyleSheet("background-color: black;")  # Чорний фон
+def global_exception_handler(exctype, value, tb):
+    """Глобальный обработчик исключений."""
+    error_message = "".join(traceback.format_exception(exctype, value, tb))
+    print(f"Critical error: {error_message}")
+    
+    # Если окно уже создано, показываем экран смерти
+    if 'window' in globals():
+        window.show_death_screen(f"Critical error: {error_message}")
+    else:
+        # Если окно не создано, создаем временное окно для отображения ошибки
+        temp_app = QApplication(sys.argv)
+        temp_window = QWidget()
+        temp_window.setWindowTitle("Critical Error")
+        temp_window.setGeometry(100, 100, 800, 600)
+        
+        death_screen = DeathScreen(temp_window, f"Critical error: {error_message}")
+        death_screen.show()
+        
+        sys.exit(temp_app.exec())
 
-        # Лейбл для відображення іконки
-        self.icon_label = QLabel(self)
-        self.icon_label.setPixmap(QPixmap(icon_dir_PATH))
-        self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # Встановлення розмірів вікна на весь екран
-        self.showFullScreen()
 
-        # Таймер для автоматичного переходу через 8 секунд
-        QTimer.singleShot(8000, self.switch_to_main_window)
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.end()
-
-    def switch_to_main_window(self):
-        self.close()
-        window = MacOSWindow()  # Замініть на свій основний клас
-        window.show()
+import os
+from PyQt6.QtWidgets import QMainWindow, QApplication, QLabel, QWidget, QVBoxLayout
+from PyQt6.QtGui import QPixmap, QCursor
+from PyQt6.QtCore import Qt, QPropertyAnimation, QRect, QTimer
 
 class MacOSWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        try:
+            self.desk_config = "root/user/desk/desk.config"
+            self.active_windows = {}
 
-        self.desk_config = "root/user/desk/desk.config"
-        self.active_windows = {}
+            # Загружаем курсор из файла Normal.cur
+            icon_dir_cursors = os.path.join("bin", "icons", "local_icons", "cursors", "Normal.cur")
+            cursor_pixmap = QPixmap(icon_dir_cursors)  # Загружаем изображение курсора
 
-        # Загружаем курсор из файла Normal.cur
-        icon_dir_cursors = os.path.join("bin", "icons", "local_icons", "cursors", "Normal.cur")
-        cursor_pixmap = QPixmap(icon_dir_cursors)  # Загружаем изображение курсора
+            # Уменьшаем размер курсора (например, в 2 раза)
+            new_width = cursor_pixmap.width() // 2
+            new_height = cursor_pixmap.height() // 2
+            scaled_pixmap = cursor_pixmap.scaled(new_width, new_height, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
 
-        # Уменьшаем размер курсора (например, в 2 раза)
-        new_width = cursor_pixmap.width() // 2
-        new_height = cursor_pixmap.height() // 2
-        scaled_pixmap = cursor_pixmap.scaled(new_width, new_height, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            # Создаем курсор с точкой наведения (0, 0)
+            cursor = QCursor(scaled_pixmap, hotX=0, hotY=0)  # Устанавливаем hotspot на (0, 0)
+            
+            # Устанавливаем курсор для главного окна
+            self.setCursor(cursor)
+            
+            # Настройки главного окна
+            self.setWindowTitle("MacOS-Style OS")
+            self.setGeometry(0, 0, QApplication.primaryScreen().size().width(), 
+                            QApplication.primaryScreen().size().height())
+            self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
+            self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
-        # Создаем курсор с точкой наведения (0, 0)
-        cursor = QCursor(scaled_pixmap, hotX=0, hotY=0)  # Устанавливаем hotspot на (0, 0)
-        
-        # Устанавливаем курсор для главного окна
-        self.setCursor(cursor)
-        
-        # Настройки главного окна
-        self.setWindowTitle("MacOS-Style OS")
-        self.setGeometry(0, 0, QApplication.primaryScreen().size().width(), 
-                        QApplication.primaryScreen().size().height())
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+            # Фоновое изображение для всего приложения
+            self.background = QLabel(self)
+            self.background.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.load_background_image()
+            
+            # Основной контейнер
+            central_widget = QWidget()
+            self.setCentralWidget(central_widget)
+            self.main_layout = QVBoxLayout(central_widget)
+            self.main_layout.setContentsMargins(0, 0, 0, 0)
+            
+            # Рабочий стол (прозрачный)
+            self.create_desktop_window()
+            
+            # Док-панель
+            self.create_dock_panel()
+            
+            # Остальные элементы
+            self.create_menu()
+            self.open_windows = {}
+            self.create_all_windows()
+            self.check_for_updates()
 
-        # Фоновое изображение для всего приложения
-        self.background = QLabel(self)
-        self.background.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.load_background_image()
-        
-        # Основной контейнер
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        self.main_layout = QVBoxLayout(central_widget)
-        self.main_layout.setContentsMargins(0, 0, 0, 0)
-        
-        # Рабочий стол (прозрачный)
-        self.create_desktop_window()
-        
-        # Док-панель
-        self.create_dock_panel()
-        
-        # Остальные элементы
-        self.create_menu()
-        self.open_windows = {}
-        self.create_all_windows()
-        self.check_for_updates()
+            
+            # Создаем экран блокировки
+            self.create_lock_screen()
+            # Создаем черный экран с логотипом
+            self.create_splash_screen()
+        except Exception as e:
+            # Если ошибка происходит в конструкторе, показываем её в DeathScreen
+            self.show_death_screen(f"Critical error in constructor: {str(e)}")
+
+
+    def show_death_screen(self, error_message):
+        """Показывает экран смерти с сообщением об ошибке."""
+        self.death_screen = DeathScreen(self, error_message)
+        self.death_screen.show()
+
+
+    def create_lock_screen(self):
+        # Создаем виджет для экрана блокировки
+        self.lock_widget = QWidget(self)
+        self.lock_widget.setGeometry(0, 0, self.width(), self.height())
+
+        # Устанавливаем фон (например, изображение)
+        background_pixmap = QPixmap(os.path.join("bin", "icons", "local_icons", "IconOs", "lock.jpg"))
+        background_label = QLabel(self.lock_widget)
+        background_label.setPixmap(background_pixmap.scaled(self.width(), self.height(), Qt.AspectRatioMode.KeepAspectRatioByExpanding))
+        background_label.setGeometry(0, 0, self.width(), self.height())
+
+        # Логотип
+        icon_dir_path = os.path.join("bin", "icons", "local_icons", "IconOs", "OS.png")
+        logo_pixmap = QPixmap(icon_dir_path)
+
+        # Уменьшаем размер изображения логотипа (например, в 2 раза)
+        new_width = logo_pixmap.width() // 2
+        new_height = logo_pixmap.height() // 2
+        scaled_pixmap = logo_pixmap.scaled(new_width, new_height, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+
+        logo_label = QLabel(self.lock_widget)
+        logo_label.setPixmap(scaled_pixmap)
+        logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        logo_label.setGeometry(
+            (self.width() - scaled_pixmap.width()) // 2,
+            (self.height() - scaled_pixmap.height()) // 2 - 50,  # Сдвигаем логотип выше, чтобы освободить место для поля ввода пароля
+            scaled_pixmap.width(),
+            scaled_pixmap.height()
+        )
+
+        # Поле ввода пароля
+        self.password_input = QLineEdit(self.lock_widget)
+        self.password_input.setGeometry(
+            (self.width() - 200) // 2,  # Центрируем поле ввода по горизонтали
+            logo_label.y() + logo_label.height() + 20,  # Размещаем поле ввода под логотипом
+            200,  # Ширина поля ввода
+            30    # Высота поля ввода
+        )
+        self.password_input.setPlaceholderText("Password")
+        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)  # Скрываем вводимые символы
+
+        # Устанавливаем стиль для поля ввода
+        self.password_input.setStyleSheet("""
+            QLineEdit {
+                border: 2px solid #555;  /* Граница поля ввода */
+                border-radius: 5px;      /* Закругленные углы */
+                padding: 5px;           /* Внутренний отступ */
+                background-color: rgba(0, 0, 0, 150);  /* Полупрозрачный черный фон */
+                color: white;           /* Цвет текста */
+                font-size: 14px;        /* Размер шрифта */
+            }
+            QLineEdit:focus {
+                border: 2px solid #0078D7;  /* Граница при фокусе */
+            }
+        """)
+        self.password_input.returnPressed.connect(self.unlock_screen)  # Обработка нажатия Enter
+
+        # Активируем поле ввода пароля
+        self.password_input.setFocus()
+
+    def unlock_screen(self):
+        # Проверяем пароль (например, пароль "0000")
+        if self.password_input.text() == "":
+            # Запускаем анимацию разблокировки
+            self.animation = QPropertyAnimation(self.lock_widget, b"geometry")
+            self.animation.setDuration(200)  # Длительность анимации 0.5 секунды
+            self.animation.setStartValue(QRect(0, 0, self.width(), self.height()))
+            self.animation.setEndValue(QRect(0, -self.height(), self.width(), self.height()))
+            self.animation.finished.connect(self.lock_widget.deleteLater)  # Удаляем виджет после завершения анимации
+            self.animation.start()
+
+        else:
+            # Показываем сообщение об ошибке
+            QMessageBox.warning(self, "Error", "Incorrect password!")
+
+    def keyPressEvent(self, event):
+        # Обработка нажатия клавиши Enter
+        if event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
+            self.unlock_screen()
+        else:
+            super().keyPressEvent(event)
+
+    def create_splash_screen(self):
+        # Создаем виджет для черного экрана
+        self.splash_widget = QWidget(self)
+        self.splash_widget.setGeometry(0, 0, self.width(), self.height())
+        self.splash_widget.setStyleSheet("background-color: black;")
+
+        # Логотип
+        icon_dir_path = os.path.join("bin", "icons", "local_icons", "IconOs", "OS.png")
+        logo_pixmap = QPixmap(icon_dir_path)
+
+        # Уменьшаем размер изображения логотипа (например, в 2 раза)
+        new_width = logo_pixmap.width() // 2
+        new_height = logo_pixmap.height() // 2
+        scaled_pixmap = logo_pixmap.scaled(new_width, new_height, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+
+        logo_label = QLabel(self.splash_widget)
+        logo_label.setPixmap(scaled_pixmap)
+        logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        logo_label.setGeometry(
+            (self.width() - scaled_pixmap.width()) // 2,
+            (self.height() - scaled_pixmap.height()) // 2 - 50,  # Сдвигаем логотип выше, чтобы освободить место для прогресс-бара
+            scaled_pixmap.width(),
+            scaled_pixmap.height()
+        )
+
+        # Прогресс-бар
+        self.progress_bar = QProgressBar(self.splash_widget)
+        self.progress_bar.setGeometry(
+            (self.width() - 300) // 2,  # Центрируем прогресс-бар по горизонтали
+            logo_label.y() + logo_label.height() + 20,  # Размещаем прогресс-бар под логотипом
+            300,  # Ширина прогресс-бара
+            20    # Высота прогресс-бара
+        )
+        self.progress_bar.setRange(0, 100)  # Устанавливаем диапазон от 0 до 100
+        self.progress_bar.setValue(0)  # Начальное значение прогресс-бара
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                border: 2px solid grey;
+                border-radius: 5px;
+                text-align: center;
+                background-color: black;
+            }
+            QProgressBar::chunk {
+                background-color: #05B8CC;
+                width: 10px;
+            }
+        """)
+
+        # Таймер для задержки перед анимацией
+        self.timer = QTimer()
+        self.timer.setSingleShot(True)  # Таймер сработает только один раз
+        self.timer.timeout.connect(self.start_animation)  # Подключаем слот для запуска анимации
+        self.timer.start(5000)  # Задержка 8 секунд
+
+        # Таймер для обновления прогресс-бара
+        self.progress_timer = QTimer()
+        self.progress_timer.timeout.connect(self.update_progress)
+        self.progress_timer.start(80)  # Обновляем прогресс-бар каждые 80 мс (примерно 8 секунд до 100%)
+
+    def update_progress(self):
+        # Обновляем значение прогресс-бара
+        current_value = self.progress_bar.value()
+        if current_value < 50:
+            self.progress_bar.setValue(current_value + 1)
+        else:
+            self.progress_timer.stop()  # Останавливаем таймер, когда прогресс-бар достигнет 100%
+
+    def start_animation(self):
+        # Анимация исчезания вверх
+        self.animation = QPropertyAnimation(self.splash_widget, b"geometry")
+        self.animation.setDuration(200)  # Длительность анимации 1 секунда
+        self.animation.setStartValue(QRect(0, 0, self.width(), self.height()))
+        self.animation.setEndValue(QRect(0, -self.height(), self.width(), self.height()))
+        self.animation.finished.connect(self.splash_widget.deleteLater)  # Удаляем виджет после завершения анимации
+        self.animation.start()
+
+
 
     def check_for_updates(self):
         """Проверяет наличие обновлений и показывает окно обновления."""
@@ -395,6 +623,11 @@ class MacOSWindow(QMainWindow):
         reboot_action.triggered.connect(self.reboot_system)
         power_menu.addAction(reboot_action)
 
+        # Действие для блокировки экрана
+        lock_action = QAction("Lock", self)  # Кнопка блокировки
+        lock_action.triggered.connect(self.lock_screen)  # Связываем с методом блокировки
+        power_menu.addAction(lock_action)  # Добавляем в меню "Power"
+
         # Создание метки для времени и даты
         self.time_label = QLabel()
         self.time_label.setFont(QFont("Helvetica", 14))
@@ -409,6 +642,22 @@ class MacOSWindow(QMainWindow):
         # Добавление времени в правый угол меню
         menubar.setCornerWidget(self.time_label, Qt.Corner.TopRightCorner)
 
+    def lock_screen(self):
+        """Блокирует экран."""
+        # Скрываем рабочий стол и док-панель
+        self.centralWidget().hide()
+        if hasattr(self, 'dock_panel'):
+            self.dock_panel.hide()
+
+        # Создаем экран блокировки, если он еще не создан
+        if not hasattr(self, 'lock_widget'):
+            self.create_lock_screen()
+
+        # Показываем экран блокировки
+        # self.lock_widget.show()
+        # self.password_input.setFocus()  # Активируем поле ввода пароля
+
+        
     def shutdown_system(self):
         """
         Выключает систему.
@@ -624,6 +873,7 @@ class MacOSWindow(QMainWindow):
             print(f"Окно {window_name} не открыто. Открываем...")
             self.open_windows[window_name] = getattr(self, f"create_{window_name}_window")()
             self.open_windows[window_name].show()
+            
 
 
     def show_context_menu(self, window_name, button):
@@ -765,23 +1015,19 @@ class MacOSWindow(QMainWindow):
                     border: none;
                 """)
 
-# if __name__ == "__main__":
-#     app = QApplication(sys.argv)
-
-#     # Путь к логотипу
-#     icon_dir_PATH = os.path.join("bin", "icons", "local_icons", "IconOs", "OS.png")  # Укажи правильный путь к логотипу
-
-#     # Создаем основное окно
-#     window = MacOSWindow()
-
-#     # Показываем основное окно после завершения загрузки
-#     window.show()
-#     # check_for_updates()
-
-#     sys.exit(app.exec())
 
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    splash_screen = SplashScreen()
-    splash_screen.show()
-    sys.exit(app.exec())
+    # Устанавливаем глобальный обработчик исключений
+    sys.excepthook = global_exception_handler
+
+    try:
+        app = QApplication(sys.argv)
+        window = MacOSWindow()
+        window.show()
+
+        sys.exit(app.exec())
+    except Exception as e:
+        # Если ошибка произошла до создания окна, показываем её в DeathScreen через временное окно
+        global_exception_handler(type(e), e, e.__traceback__)
+
+

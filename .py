@@ -1,84 +1,50 @@
 import sys
-from PyQt6.QtCore import Qt, QRect, QPropertyAnimation, QEasingCurve
-from PyQt6.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QFrame
+import os
+from PyQt6.QtCore import QTimer, Qt
+from PyQt6.QtGui import QPixmap, QPainter
+from PyQt6.QtWidgets import QApplication, QWidget, QLabel
 
-class NestedWindow(QWidget):
+# Шлях до іконки
+icon_dir_PATH = os.path.join("bin", "icons", "local_icons", "IconOs", "OS.png")
+
+class SplashScreen(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle('Вложенное окно')
-        self.setGeometry(50, 50, 400, 300)
+        # Налаштування вікна SplashScreen
+        self.setWindowTitle("Завантаження...")
+        self.setStyleSheet("background-color: black;")  # Чорний фон
 
-        self.button_minimize = QPushButton('Сворачивать', self)
-        self.button_minimize.clicked.connect(self.minimize_window)
-        
-        self.button_restore = QPushButton('Разворачивать', self)
-        self.button_restore.clicked.connect(self.restore_window)
-        self.button_restore.setEnabled(False)  # Кнопка для восстановления будет отключена на старте
-        
-        layout = QVBoxLayout()
-        layout.addWidget(self.button_minimize)
-        layout.addWidget(self.button_restore)
-        self.setLayout(layout)
+        # Лейбл для відображення іконки
+        self.icon_label = QLabel(self)
+        self.icon_label.setPixmap(QPixmap(icon_dir_PATH))
+        self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.is_minimized = False
-        self.animation = QPropertyAnimation(self, b"geometry")
-        self.animation.setDuration(120)
-        self.animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
+        # Встановлення розмірів вікна на весь екран
+        self.showFullScreen()
 
-    def minimize_window(self):
-        # Анимация сворачивания
-        self.animation.setStartValue(self.geometry())
-        self.animation.setEndValue(QRect(int(self.x() + self.width() / 2), int(self.y() + self.height() / 2), 10, 10))
-        self.animation.start()
-        self.is_minimized = True
+        # Таймер для автоматичного переходу через 8 секунд
+        QTimer.singleShot(8000, self.switch_to_main_window)
 
-        # Отключаем кнопку сворачивания, включаем кнопку развертывания
-        self.button_minimize.setEnabled(False)
-        self.button_restore.setEnabled(True)
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.end()
 
-    def restore_window(self):
-        # Анимация разворачивания
-        self.animation.setStartValue(self.geometry())
-        self.animation.setEndValue(QRect(50, 50, 400, 300))
-        self.animation.start()
-        self.is_minimized = False
+    def switch_to_main_window(self):
+        self.close()
+        window = MacOSWindow()  # Замініть на свій основний клас
+        window.show()
 
-        # Отключаем кнопку развертывания, включаем кнопку сворачивания
-        self.button_minimize.setEnabled(True)
-        self.button_restore.setEnabled(False)
-
-
-class Window(QWidget):
+class MacOSWindow(QWidget):
     def __init__(self):
         super().__init__()
+        self.setWindowTitle("Основне вікно")
+        self.setGeometry(100, 100, 1024, 768)
+        self.setStyleSheet("background-color: white;")
 
-        self.setWindowTitle('Основное окно с вложенными окнами')
-        self.setGeometry(100, 100, 600, 400)
-
-        self.layout = QVBoxLayout(self)
-
-        self.button = QPushButton('Создать вложенное окно', self)
-        self.button.clicked.connect(self.create_nested_window)
-        
-        self.layout.addWidget(self.button)
-
-        self.nested_window_frame = QFrame(self)
-        self.nested_window_frame.setGeometry(50, 50, 400, 300)
-        self.nested_window_frame.setStyleSheet("background-color: lightgray; border: 1px solid black;")
-
-        self.layout.addWidget(self.nested_window_frame)
-
-    def create_nested_window(self):
-        # Вложенное окно будет добавлено в этот фрейм
-        nested_window = NestedWindow()
-        nested_window.setParent(self.nested_window_frame)  # Вложение окна в основной контейнер
-        nested_window.setGeometry(0, 0, 400, 300)
-        nested_window.show()
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = Window()
-    window.show()
+    splash_screen = SplashScreen()
+    splash_screen.show()
     sys.exit(app.exec())

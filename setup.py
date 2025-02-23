@@ -23,7 +23,6 @@ except ImportError:
 
 
 
-import os
 from PyQt6.QtWidgets import QFrame, QPushButton, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QGraphicsDropShadowEffect
 from PyQt6.QtCore import QPropertyAnimation, QEasingCurve, QRect, Qt, QSize
 from PyQt6.QtGui import QIcon, QColor, QEnterEvent, QMouseEvent
@@ -47,10 +46,10 @@ from PyQt6.QtCore import QProcess
 from PyQt6.QtWidgets import QApplication, QWidget, QProgressBar, QVBoxLayout, QLabel
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt, QTimer
-
-import sys
 import os
-import subprocess
+import platform  # Добавьте этот импорт
+
+
 
 
 
@@ -142,67 +141,37 @@ class JumpingButton(QPushButton):
         self.animation.finished.disconnect()
 
 
+# Шлях до іконки
+icon_dir_PATH = os.path.join("bin", "icons", "local_icons", "IconOs", "OS.png")
+
 class SplashScreen(QWidget):
-    def __init__(self, icon_path, parent=None):
-        super().__init__(parent)
-        
-        # Устанавливаем чёрный фон
-        self.setStyleSheet("background-color: black;")
-        
-        # Устанавливаем размеры экрана
-        screen_geometry = QApplication.primaryScreen().geometry()
-        self.setGeometry(screen_geometry)
-        
-        # Создаем layout для размещения элементов
-        layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Центрируем элементы
-        
-        # Загружаем логотип
-        self.logo = QLabel(self)
-        self.logo.setPixmap(QPixmap(icon_path).scaled(400, 400, Qt.AspectRatioMode.KeepAspectRatio))
-        layout.addWidget(self.logo, alignment=Qt.AlignmentFlag.AlignCenter)
-        
-        # Создаем прогресс-бар
-        self.progress_bar = QProgressBar(self)
-        self.progress_bar.setFixedWidth(300)  # Ширина прогресс-бара
-        self.progress_bar.setStyleSheet("""
-            QProgressBar {
-                border: 2px solid grey;
-                border-radius: 5px;
-                background-color: #333;
-                text-align: center;  # Убираем текст процентов
-            }
-            QProgressBar::chunk {
-                background-color: #4bcfff;
-                width: 10px;
-            }
-        """)
-        self.progress_bar.setFormat("")  # Убираем текст процентов
-        layout.addWidget(self.progress_bar, alignment=Qt.AlignmentFlag.AlignCenter)
-        
-        # Таймер для имитации загрузки
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.update_progress)
-        self.progress_value = 0
+    def __init__(self):
+        super().__init__()
 
-    def start(self):
-        """Запуск экрана загрузки"""
-        self.timer.start(40)  # Обновление прогресс-бара каждые 40 мс
+        # Налаштування вікна SplashScreen
+        self.setWindowTitle("Завантаження...")
+        self.setStyleSheet("background-color: black;")  # Чорний фон
 
-    def update_progress(self):
-        """Обновление прогресс-бара"""
-        self.progress_value += 1
-        self.progress_bar.setValue(self.progress_value)
-        
-        # Если прогресс достиг 100%, закрываем экран загрузки
-        if self.progress_value >= 100:
-            self.timer.stop()
-            self.close()
-import platform  # Добавьте этот импорт
+        # Лейбл для відображення іконки
+        self.icon_label = QLabel(self)
+        self.icon_label.setPixmap(QPixmap(icon_dir_PATH))
+        self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
+        # Встановлення розмірів вікна на весь екран
+        self.showFullScreen()
 
+        # Таймер для автоматичного переходу через 8 секунд
+        QTimer.singleShot(8000, self.switch_to_main_window)
 
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.end()
 
+    def switch_to_main_window(self):
+        self.close()
+        window = MacOSWindow()  # Замініть на свій основний клас
+        window.show()
 
 class MacOSWindow(QMainWindow):
     def __init__(self):
@@ -796,24 +765,23 @@ class MacOSWindow(QMainWindow):
                     border: none;
                 """)
 
+# if __name__ == "__main__":
+#     app = QApplication(sys.argv)
+
+#     # Путь к логотипу
+#     icon_dir_PATH = os.path.join("bin", "icons", "local_icons", "IconOs", "OS.png")  # Укажи правильный путь к логотипу
+
+#     # Создаем основное окно
+#     window = MacOSWindow()
+
+#     # Показываем основное окно после завершения загрузки
+#     window.show()
+#     # check_for_updates()
+
+#     sys.exit(app.exec())
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-
-    # Путь к логотипу (переменная icon_dir_PATH)
-    # icon_dir_PATH = os.path.join("bin", "icons", "logo.png")  # Укажи правильный путь к логотипу
-
-    # Создаем экран загрузки
-    # splash = SplashScreen(icon_dir_PATH)
-    # splash.show()
-
-    # # Имитируем загрузку
-    # splash.start()
-
-    # Создаем основное окно
-    window = MacOSWindow()
-
-    # Показываем основное окно после завершения загрузки
-    window.show()
-    # check_for_updates()
-
+    splash_screen = SplashScreen()
+    splash_screen.show()
     sys.exit(app.exec())

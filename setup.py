@@ -230,6 +230,7 @@ class MacOSWindow(QMainWindow):
         super().__init__()
         self.is_locked = False  # Флаг для отслеживания состояния блокировки
         self.is_splash_screen_active = False  # Флаг для отслеживания состояния загрузочного экрана
+        self.is_password_input_deleted = False
         try:
             self.desk_config = "root/user/desk/desk.config"
             self.active_windows = {}
@@ -473,20 +474,35 @@ class MacOSWindow(QMainWindow):
 
 
     def unlock_screen(self):
-        # Проверяем пароль (например, пароль "0000")
-        if self.password_input.text() == "":
-            self.is_locked = False  # Снимаем флаг блокировки
-            # Запускаем анимацию разблокировки
-            self.animation = QPropertyAnimation(self.lock_widget, b"geometry")
-            self.animation.setDuration(200)  # Длительность анимации 0.5 секунды
-            self.animation.setStartValue(QRect(0, 0, self.width(), self.height()))
-            self.animation.setEndValue(QRect(0, -self.height(), self.width(), self.height()))
-            self.animation.finished.connect(self.lock_widget.deleteLater)  # Удаляем виджет после завершения анимации
-            self.animation.start()
+        """Разблокирует экран, если пароль верный."""
+        # Проверяем, существует ли еще виджет и поле ввода пароля
+        if not hasattr(self, 'lock_widget') or self.lock_widget is None:
+            return  # Если виджет уже удален, выходим из метода
 
-        else:
-            # Показываем сообщение об ошибке
-            QMessageBox.warning(self, "Error", "Incorrect password!")
+        if not hasattr(self, 'password_input') or self.password_input is None:
+            return  # Если поле ввода пароля уже удалено, выходим из метода
+
+        # Проверяем, существует ли объект password_input
+        try:
+            # Проверяем пароль (например, пароль "0000")
+            if self.password_input.text() == "":  # Пустой пароль для примера
+                self.is_locked = False  # Снимаем флаг блокировки
+
+                # Запускаем анимацию разблокировки
+                self.animation = QPropertyAnimation(self.lock_widget, b"geometry")
+                self.animation.setDuration(200)  # Длительность анимации 0.5 секунды
+                self.animation.setStartValue(QRect(0, 0, self.width(), self.height()))
+                self.animation.setEndValue(QRect(0, -self.height(), self.width(), self.height()))
+
+                # Удаляем виджет после завершения анимации
+                self.animation.finished.connect(self.lock_widget.deleteLater)
+                self.animation.start()
+            else:
+                # Показываем сообщение об ошибке
+                QMessageBox.warning(self, "Error", "Incorrect password!")
+        except RuntimeError:
+            # Если объект уже удален, просто выходим из метода
+            return
 
 
     def create_splash_screen(self):

@@ -807,7 +807,7 @@ class MacOSWindow(QMainWindow):
         self.window_switch_menu.popup(QPoint(self.width() // 2, self.height() // 2))
 
     def lock_screen(self):
-        """Блокирует экран."""
+        """Блокирует экран с анимацией."""
         # Скрываем рабочий стол и док-панель
         self.create_lock_screen()
 
@@ -819,6 +819,14 @@ class MacOSWindow(QMainWindow):
         if self.lock_widget is not None:
             self.lock_widget.show()
             self.password_input.setFocus()  # Активируем поле ввода пароля
+
+            # Анимация появления экрана блокировки сверху вниз
+            self.animation = QPropertyAnimation(self.lock_widget, b"geometry")
+            self.animation.setDuration(500)  # Длительность анимации 500 мс
+            self.animation.setStartValue(QRect(0, -self.height(), self.width(), self.height()))
+            self.animation.setEndValue(QRect(0, 0, self.width(), self.height()))
+            self.animation.setEasingCurve(QEasingCurve.Type.OutQuad)  # Плавное замедление в конце
+            self.animation.start()
 
         
     def shutdown_system(self):

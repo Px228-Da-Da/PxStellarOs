@@ -1,8 +1,10 @@
 from PyQt6.QtWidgets import (
-    QVBoxLayout, QWidget, QLabel, QListWidget, QStackedWidget, QPushButton, QHBoxLayout
+    QVBoxLayout, QWidget, QLabel, QListWidget, QStackedWidget, QPushButton, QHBoxLayout, QMessageBox
 )
 from apps.local.init import DraggableResizableWindow  # Импортируем базовый класс окна
 from updater import get_current_version, get_latest_version, update_application  # Импортируем функции обновления
+import shutil
+import os
 
 class SettingsWindow(DraggableResizableWindow):
     def __init__(self, parent=None, window_name=""):
@@ -55,6 +57,12 @@ class SettingsWindow(DraggableResizableWindow):
         self.update_button.setEnabled(False)  # По умолчанию кнопка отключена
         update_layout.addWidget(self.update_button)
 
+        # Кнопка для отката обновления
+        self.rollback_button = QPushButton("Откат обновления")
+        self.rollback_button.clicked.connect(self.rollback_update)
+        self.rollback_button.setEnabled(os.path.exists("backup"))  # Включаем кнопку, если есть резервная копия
+        update_layout.addWidget(self.rollback_button)
+
         self.content_area.addWidget(update_page)
 
         # Подключаем смену контента
@@ -91,9 +99,62 @@ class SettingsWindow(DraggableResizableWindow):
             self.current_version_label.setText(f"Текущая версия: {current_version}\nОбновлений не найдено.")
             self.update_button.setEnabled(False)  # Отключаем кнопку обновления
 
+    def backup_current_version(self):
+        """Создает резервную копию текущей версии приложения."""
+        backup_dir = "backup"
+        if not os.path.exists(backup_dir):
+            os.makedirs(backup_dir)
+        
+        # Копируем текущую версию в папку backup
+        for item in os.listdir("."):
+            if item != backup_dir:
+                s = os.path.join(".", item)
+                d = os.path.join(backup_dir, item)
+                if os.path.isdir(s):
+                    shutil.copytree(s, d, symlinks=True, ignore=None)
+                else:
+                    shutil.copy2(s, d)
+
+    def rollback_update(self):
+        """Откатывает обновление, восстанавливая предыдущую версию приложения."""
+        backup_dir = "backup"
+        if not os.path.exists(backup_dir):
+            QMessageBox.warning(self, "Ошибка", "Резервная копия не найдена. Откат невозможен.")
+            return False
+        
+        # Удаляем текущую версию
+        for item in os.listdir("."):
+            if item != backup_dir:
+                if os.path.isdir(item):
+                    shutil.rmtree(item)
+                else:
+                    os.remove(item)
+        
+        # Восстанавливаем резервную копию
+        for item in os.listdir(backup_dir):
+            s = os.path.join(backup_dir, item)
+            d = os.path.join(".", item)
+            if os.path.isdir(s):
+                shutil.copytree(s, d, symlinks=True, ignore=None)
+            else:
+                shutil.copy2(s, d)
+        
+        QMessageBox.information(self, "Откат завершен", "Приложение восстановлено до предыдущей версии.")
+        self.rollback_button.setEnabled(False)  # Отключаем кнопку отката
+        return True
+
     def run_update(self):
-        """Запускает процесс обновления."""
+        """Запускает процесс обновления с возможностью отката."""
+        # Создаем резервную копию перед обновлением
+        self.backup_current_version()
+        
+        # Запускаем обновление
         if update_application():
             self.current_version_label.setText("Обновление завершено. Перезапустите ос.")
+            self.rollback_button.setEnabled(True)  # Включаем кнопку отката
         else:
-            self.current_version_label.setText("Ошибка при обновлении.")
+            self.current_version_label.setText("Ошибка при обновлении. Попытка отката...")
+            if self.rollback_update():
+                self.current_version_label.setText("Откат выполнен успешно.")
+            else:
+                self.current_version_label.setText("Откат не удался.")

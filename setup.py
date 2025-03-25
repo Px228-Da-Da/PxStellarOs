@@ -72,6 +72,13 @@ from settings_window import SettingsWindow
 from updater import UpdateDialog
 from updater import *
 
+import traceback
+
+import os
+from PyQt6.QtWidgets import QMainWindow, QApplication, QLabel, QWidget, QVBoxLayout
+from PyQt6.QtGui import QPixmap, QCursor
+from PyQt6.QtCore import Qt, QPropertyAnimation, QRect, QTimer
+
 
 class JumpingButton(QPushButton):
     def __init__(self, icon_path=None, parent=None):
@@ -195,7 +202,7 @@ class DeathScreen(QWidget):
         else:
             print(f"Unsupported platform: {system_platform}")
 
-import traceback
+
 
 
 def global_exception_handler(exctype, value, tb):
@@ -219,11 +226,6 @@ def global_exception_handler(exctype, value, tb):
         sys.exit(temp_app.exec())
 
 
-
-import os
-from PyQt6.QtWidgets import QMainWindow, QApplication, QLabel, QWidget, QVBoxLayout
-from PyQt6.QtGui import QPixmap, QCursor
-from PyQt6.QtCore import Qt, QPropertyAnimation, QRect, QTimer
 
 class MacOSWindow(QMainWindow):
     def __init__(self):
@@ -532,27 +534,27 @@ class MacOSWindow(QMainWindow):
         )
 
         # Прогресс-бар
-        self.progress_bar = QProgressBar(self.splash_widget)
-        self.progress_bar.setGeometry(
-            (self.width() - 300) // 2,  # Центрируем прогресс-бар по горизонтали
-            logo_label.y() + logo_label.height() + 20,  # Размещаем прогресс-бар под логотипом
-            300,  # Ширина прогресс-бара
-            20    # Высота прогресс-бара
-        )
-        self.progress_bar.setRange(0, 100)  # Устанавливаем диапазон от 0 до 100
-        self.progress_bar.setValue(0)  # Начальное значение прогресс-бара
-        self.progress_bar.setStyleSheet("""
-            QProgressBar {
-                border: 2px solid grey;
-                border-radius: 5px;
-                text-align: center;
-                background-color: black;
-            }
-            QProgressBar::chunk {
-                background-color: #05B8CC;
-                width: 10px;
-            }
-        """)
+        # self.progress_bar = QProgressBar(self.splash_widget)
+        # self.progress_bar.setGeometry(
+        #     (self.width() - 300) // 2,  # Центрируем прогресс-бар по горизонтали
+        #     logo_label.y() + logo_label.height() + 20,  # Размещаем прогресс-бар под логотипом
+        #     300,  # Ширина прогресс-бара
+        #     20    # Высота прогресс-бара
+        # )
+        # self.progress_bar.setRange(0, 100)  # Устанавливаем диапазон от 0 до 100
+        # self.progress_bar.setValue(0)  # Начальное значение прогресс-бара
+        # self.progress_bar.setStyleSheet("""
+        #     QProgressBar {
+        #         border: 2px solid grey;
+        #         border-radius: 5px;
+        #         text-align: center;
+        #         background-color: black;
+        #     }
+        #     QProgressBar::chunk {
+        #         background-color: #05B8CC;
+        #         width: 10px;
+        #     }
+        # """)
 
         # Таймер для задержки перед анимацией
         self.timer = QTimer()
@@ -567,7 +569,7 @@ class MacOSWindow(QMainWindow):
 
     def update_progress(self):
         # Обновляем значение прогресс-бара
-        current_value = self.progress_bar.value()
+        current_value = 50
         if current_value < 50:
             self.progress_bar.setValue(current_value + 1)
         else:

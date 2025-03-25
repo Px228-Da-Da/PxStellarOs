@@ -148,7 +148,7 @@ def download_and_extract_zip(url, destination):
 def update_files(source_folder, destination_folder):
     """Обновляет только определенные файлы и папки в локальной системе."""
     try:
-        files_to_update = ["apps", "bin", "root", "version.txt", "updater.py", "setup.py"]
+        files_to_update = ["apps", "bin", "root", "HittiScript", "version.txt", "updater.py", "setup.py"]
 
         # Удаляем только указанные файлы и папки
         for item in files_to_update:

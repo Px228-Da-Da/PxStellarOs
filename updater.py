@@ -205,6 +205,19 @@ def update_application():
     except Exception as e:
         print(f"Ошибка при обновлении приложения: {e}")
         return False
+def reboot_system():
+    """
+    Перезагружает систему.
+    """
+    system_platform = platform.system()
+    if system_platform == "Windows":
+        # Команда для перезагрузки Windows
+        QProcess.startDetached("shutdown", ["/r", "/t", "0"])
+    elif system_platform == "Linux":
+        # Команда для перезагрузки Linux
+        QProcess.startDetached("reboot")
+    else:
+        print(f"Unsupported platform: {system_platform}")
 
 def check_for_updates():
     """Проверяет наличие обновлений и предлагает пользователю обновиться."""
@@ -230,7 +243,8 @@ def check_for_updates():
             # Запускаем процесс обновления
             if update_application():
                 print("Обновление завершено. Перезапустите приложение.")
-                sys.exit(0)
+                reboot_system()
+                # sys.exit(0)
             else:
                 print("Ошибка при обновлении.")
 

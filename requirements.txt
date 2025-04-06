@@ -1,2 +1,4 @@
 PyQt6>=6.4.0
 PyQt6-WebEngine>=6.4.0
+comtypes==1.4.10
+pycaw==20240210

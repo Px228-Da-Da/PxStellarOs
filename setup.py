@@ -21,8 +21,10 @@ except ImportError:
     install_package("PyQt6-WebEngine")
 
 
-
-
+from PyQt6.QtWidgets import QSlider  # Add this with other imports
+from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+from comtypes import CLSCTX_ALL
+from ctypes import cast, POINTER
 from PyQt6.QtWidgets import QFrame, QPushButton, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QGraphicsDropShadowEffect
 from PyQt6.QtCore import QPropertyAnimation, QEasingCurve, QRect, Qt, QSize
 from PyQt6.QtGui import QIcon, QColor, QEnterEvent, QMouseEvent
@@ -30,6 +32,7 @@ from PyQt6.QtCore import QTimer, QTime, QDate
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QPushButton, QWidget, QHBoxLayout, QFrame, QLabel, QMessageBox, QStackedWidget, QMenuBar, QToolBar, QLineEdit,QTabWidget, QMenu
 )
+from PyQt6.QtWidgets import QCalendarWidget
 from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtCore import Qt, QSize, QUrl, QPoint
 from PyQt6.QtGui import QCursor, QIcon, QPixmap, QMouseEvent, QColor, QPainter, QBrush, QFont
@@ -78,7 +81,7 @@ import os
 from PyQt6.QtWidgets import QMainWindow, QApplication, QLabel, QWidget, QVBoxLayout
 from PyQt6.QtGui import QPixmap, QCursor
 from PyQt6.QtCore import Qt, QPropertyAnimation, QRect, QTimer
-
+from PyQt6.QtWidgets import QGridLayout
 
 class JumpingButton(QPushButton):
     def __init__(self, icon_path=None, parent=None):
@@ -202,7 +205,362 @@ class DeathScreen(QWidget):
         else:
             print(f"Unsupported platform: {system_platform}")
 
+class CalendarWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Календарь в стиле Windows 11")
+        self.resize(350, 350)
+        self.setStyleSheet("""
+            QWidget {
+                background-color: rgba(30, 30, 30, 0.9);
+                color: white;
+                border-radius: 8px;
+            }
+            QPushButton {
+                background-color: transparent;
+                color: white;
+                font-size: 18px;
+                border: none;
+                padding: 5px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.1);
+            }
+            QPushButton:pressed {
+                background-color: rgba(255, 255, 255, 0.2);
+            }
+            #header {
+                background-color: transparent;
+                color: white;
+                border-top-left-radius: 8px;
+                border-top-right-radius: 8px;
+                padding: 10px;
+            }
+            #monthYearLabel {
+                font-size: 16px;
+                font-weight: bold;
+                color: white;
+            }
+            #weekdays {
+                font-size: 12px;
+                font-weight: bold;
+                color: rgba(255, 255, 255, 0.8);
+                padding: 5px 0;
+            }
+            .day {
+                font-size: 14px;
+                border-radius: 4px;
+                min-width: 30px;
+                min-height: 30px;
+                color: white;
+            }
+            .day:hover {
+                background-color: rgba(255, 255, 255, 0.1);
+            }
+            .current-day {
+                background-color: rgba(255, 255, 255, 0.3);
+                color: white;
+                font-weight: bold;
+            }
+            .selected-day {
+                background-color: rgba(255, 255, 255, 0.4);
+                color: white;
+                font-weight: bold;
+            }
+            .other-month {
+                color: rgba(255, 255, 255, 0.5);
+            }
+            .nav-button {
+                border-radius: 4px;
+                padding: 5px 10px;
+                font-size: 16px;
+            }
+            .nav-button:hover {
+                background-color: rgba(255, 255, 255, 0.2);
+            }
+        """)
+        
+        # Добавляем эффект тени
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(20)
+        shadow.setColor(QColor(0, 0, 0, 150))
+        shadow.setOffset(0, 4)
+        self.setGraphicsEffect(shadow)
+        
+        self.current_date = QDate.currentDate()
+        self.selected_date = None
+        self.initUI()
+        
+    def mousePressEvent(self, event):
+        # Если клик был за пределами виджета, закрываем его
+        if not self.rect().contains(event.pos()):
+            self.close()
+        super().mousePressEvent(event)
+        
+    def initUI(self):
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        
+        # Header with month/year and navigation
+        header = QWidget()
+        header.setObjectName("header")
+        header_layout = QHBoxLayout(header)
+        
+        self.prev_month_btn = QPushButton("◀")
+        self.prev_month_btn.setObjectName("nav-button")
+        self.prev_month_btn.clicked.connect(self.prev_month)
+        
+        self.month_year_label = QLabel()
+        self.month_year_label.setObjectName("monthYearLabel")
+        self.month_year_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        self.next_month_btn = QPushButton("▶")
+        self.next_month_btn.setObjectName("nav-button")
+        self.next_month_btn.clicked.connect(self.next_month)
+        
+        header_layout.addWidget(self.prev_month_btn)
+        header_layout.addWidget(self.month_year_label, 1)
+        header_layout.addWidget(self.next_month_btn)
+        
+        main_layout.addWidget(header)
+        
+        # Weekdays header
+        weekdays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
+        weekdays_widget = QWidget()
+        weekdays_widget.setObjectName("weekdays")
+        weekdays_layout = QHBoxLayout(weekdays_widget)
+        weekdays_layout.setContentsMargins(0, 5, 0, 5)
+        weekdays_layout.setSpacing(0)
+        
+        for day in weekdays:
+            label = QLabel(day)
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            weekdays_layout.addWidget(label)
+        
+        main_layout.addWidget(weekdays_widget)
+        
+        # Calendar grid - 6 строк
+        self.calendar_grid = QGridLayout()
+        self.calendar_grid.setHorizontalSpacing(0)
+        self.calendar_grid.setVerticalSpacing(0)
+        self.calendar_grid.setContentsMargins(5, 5, 5, 5)
+        
+        main_layout.addLayout(self.calendar_grid)
+        
+        self.update_calendar()
+        
+    def update_calendar(self):
+        # Update month/year label
+        month = self.current_date.toString("MMMM")
+        year = self.current_date.toString("yyyy")
+        self.month_year_label.setText(f"{month} {year}")
+        
+        # Clear previous days
+        for i in reversed(range(self.calendar_grid.count())): 
+            self.calendar_grid.itemAt(i).widget().setParent(None)
+        
+        # Get first day of month and days in month
+        first_day = QDate(self.current_date.year(), self.current_date.month(), 1)
+        days_in_month = first_day.daysInMonth()
+        
+        # Get the weekday of the first day (1 = Monday, 7 = Sunday)
+        start_day = first_day.dayOfWeek()
+        
+        # Get days from previous month to show
+        prev_month = first_day.addMonths(-1)
+        days_in_prev_month = prev_month.daysInMonth()
+        
+        # Fill the grid with exactly 6 weeks (42 days)
+        day_counter = 1
+        current_row = 0
+        
+        # Previous month days
+        prev_month_days_to_show = start_day - 1
+        prev_month_start_day = days_in_prev_month - prev_month_days_to_show + 1
+        
+        for i in range(prev_month_days_to_show):
+            day = prev_month_start_day + i
+            btn = QPushButton(str(day))
+            btn.setProperty("class", "other-month")
+            btn.setCursor(Qt.CursorShape.ArrowCursor)
+            self.calendar_grid.addWidget(btn, current_row, i % 7)
+            
+            if (i + 1) % 7 == 0:
+                current_row += 1
+        
+        # Current month days
+        current_day = QDate.currentDate()
+        for day in range(1, days_in_month + 1):
+            btn = QPushButton(str(day))
+            btn.setProperty("class", "day")
+            
+            # Check if this day is selected
+            is_selected = (self.selected_date and 
+                          day == self.selected_date.day() and 
+                          self.current_date.month() == self.selected_date.month() and 
+                          self.current_date.year() == self.selected_date.year())
+            
+            # Check if this is current day
+            is_current = (day == current_day.day() and 
+                         self.current_date.month() == current_day.month() and 
+                         self.current_date.year() == current_day.year())
+            
+            if is_selected:
+                btn.setProperty("class", "selected-day")
+            elif is_current:
+                btn.setProperty("class", "current-day")
+            
+            btn.clicked.connect(lambda _, d=day: self.day_clicked(d))
+            
+            col = (prev_month_days_to_show + day - 1) % 7
+            row = (prev_month_days_to_show + day - 1) // 7
+            
+            self.calendar_grid.addWidget(btn, row, col)
+            day_counter += 1
+        
+        # Next month days to fill exactly 6 weeks (42 cells)
+        next_month_days_needed = 42 - (prev_month_days_to_show + days_in_month)
+        next_month = first_day.addMonths(1)
+        
+        for i in range(1, next_month_days_needed + 1):
+            btn = QPushButton(str(i))
+            btn.setProperty("class", "other-month")
+            btn.setCursor(Qt.CursorShape.ArrowCursor)
+            
+            total_days_shown = prev_month_days_to_show + days_in_month + i - 1
+            col = total_days_shown % 7
+            row = total_days_shown // 7
+            
+            self.calendar_grid.addWidget(btn, row, col)
+    
+    def day_clicked(self, day):
+        self.selected_date = QDate(self.current_date.year(), self.current_date.month(), day)
+        self.update_calendar()
+    
+    def prev_month(self):
+        self.current_date = self.current_date.addMonths(-1)
+        self.update_calendar()
+    
+    def next_month(self):
+        self.current_date = self.current_date.addMonths(1)
+        self.update_calendar()
+    
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        # Draw rounded corners
+        rect = self.rect()
+        painter.setBrush(QBrush(QColor(30, 30, 30, 230)))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(rect, 8, 8)
 
+class VolumeControlWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Громкость")
+        self.resize(350, 100)  # Уменьшаем высоту по сравнению с календарем
+        self.setStyleSheet("""
+            QWidget {
+                background-color: rgba(30, 30, 30, 0.9);
+                color: white;
+                border-radius: 8px;
+            }
+            QSlider::groove:horizontal {
+                border: 1px solid #999999;
+                height: 6px;
+                background: rgba(255, 255, 255, 0.2);
+                border-radius: 3px;
+            }
+            QSlider::handle:horizontal {
+                background: #4bcfff;
+                border: 1px solid #5c5c5c;
+                width: 16px;
+                margin: -5px 0;
+                border-radius: 8px;
+            }
+            QSlider::sub-page:horizontal {
+                background: #4bcfff;
+            }
+            QLabel {
+                color: white;
+                font-size: 14px;
+            }
+        """)
+        
+        # Добавляем эффект тени
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(20)
+        shadow.setColor(QColor(0, 0, 0, 150))
+        shadow.setOffset(0, 4)
+        self.setGraphicsEffect(shadow)
+        
+        # Инициализация аудио
+        try:
+            devices = AudioUtilities.GetSpeakers()
+            interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+            self.volume = cast(interface, POINTER(IAudioEndpointVolume))
+        except Exception as e:
+            print(f"Audio initialization error: {e}")
+            self.volume = None
+        
+        # Основной лэйаут
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setSpacing(10)
+        
+        # Заголовок
+        self.title_label = QLabel("Громкость")
+        self.title_label.setStyleSheet("font-size: 16px; font-weight: bold;")
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        main_layout.addWidget(self.title_label)
+        
+        # Ползунок громкости
+        self.volume_slider = QSlider(Qt.Orientation.Horizontal)
+        self.volume_slider.setRange(0, 100)
+        self.volume_slider.valueChanged.connect(self.set_system_volume)
+        main_layout.addWidget(self.volume_slider)
+        
+        # Метка с текущим уровнем громкости
+        self.volume_label = QLabel("100%")
+        self.volume_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        main_layout.addWidget(self.volume_label)
+        
+        # Устанавливаем текущее значение громкости
+        self.update_volume()
+    
+    def update_volume(self):
+        """Обновляет ползунок и метку текущей громкостью"""
+        try:
+            if self.volume:
+                current_volume = self.volume.GetMasterVolumeLevelScalar()
+                volume_percent = int(current_volume * 100)
+                self.volume_slider.setValue(volume_percent)
+                self.volume_label.setText(f"{volume_percent}%")
+        except Exception as e:
+            print(f"Volume update error: {e}")
+    
+    def set_system_volume(self, value):
+        """Устанавливает системную громкость"""
+        try:
+            if self.volume:
+                volume_level = value / 100.0
+                self.volume.SetMasterVolumeLevelScalar(volume_level, None)
+                self.volume_label.setText(f"{value}%")
+        except Exception as e:
+            print(f"Volume set error: {e}")
+    
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        # Draw rounded corners
+        rect = self.rect()
+        painter.setBrush(QBrush(QColor(30, 30, 30, 230)))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(rect, 8, 8)
 
 
 def global_exception_handler(exctype, value, tb):
@@ -253,7 +611,7 @@ class MacOSWindow(QMainWindow):
             self.setCursor(cursor)
             
             # Настройки главного окна
-            self.setWindowTitle("MacOS-Style OS")
+            self.setWindowTitle("OS")
             self.setGeometry(0, 0, QApplication.primaryScreen().size().width(), 
                             QApplication.primaryScreen().size().height())
             self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
@@ -275,6 +633,9 @@ class MacOSWindow(QMainWindow):
             
             # Док-панель
             self.create_dock_panel()
+            self.create_time_button()
+            # Создаем кнопку громкости
+            self.create_volume_button()
             
             # Остальные элементы
             self.create_menu()
@@ -286,17 +647,303 @@ class MacOSWindow(QMainWindow):
             # Создаем экран блокировки
             self.create_lock_screen()
             # Создаем черный экран с логотипом
-            self.create_splash_screen()
+            # self.create_splash_screen()
         except Exception as e:
             # Если ошибка происходит в конструкторе, показываем её в DeathScreen
             self.show_death_screen(f"Critical error in constructor: {str(e)}")
+
+    def create_volume_button(self):
+        """Создает кнопку громкости в правом нижнем углу"""
+        # Создаем контейнер для кнопки
+        self.volume_button_container = QWidget(self)
+        self.volume_button_container.setFixedSize(60, 60)
+        self.volume_button_container.move(
+            self.width() - 190,  # Позиция слева от кнопки времени
+            self.height() - 65   # Такая же высота как у кнопки времени
+        )
+        
+        # Вертикальный лэйаут для кнопки
+        layout = QVBoxLayout(self.volume_button_container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        # Создаем кнопку
+        self.volume_button = QPushButton()
+        self.volume_button.setFixedSize(60, 60)
+        self.volume_button.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0.25);
+                border-radius: 16px;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                padding: 0;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.35);
+            }
+        """)
+        
+        # Иконка громкости
+        self.volume_icon = QLabel(self.volume_button)
+        self.volume_icon.setPixmap(QIcon(os.path.join("bin", "icons", "local_icons", "system", "volume.png")).pixmap(30, 30))
+        self.volume_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.volume_icon.setGeometry(15, 15, 30, 30)
+        
+        layout.addWidget(self.volume_button)
+        
+        # Создаем виджет управления громкостью (изначально скрыт)
+        self.volume_widget = VolumeControlWidget()
+        self.volume_widget.setParent(self)
+        # self.volume_widget.move(
+        #     self.width() - 370,  # Позиционируем слева от кнопки
+        #     self.height() - 140  # Позиционируем выше кнопки
+        # )
+        self.volume_widget.hide()
+        
+        # Подключаем клик по кнопке громкости
+        self.volume_button.clicked.connect(self.toggle_volume_control)
+        
+        # Таймер для обновления иконки громкости
+        self.volume_timer = QTimer(self)
+        self.volume_timer.timeout.connect(self.update_volume_icon)
+        self.volume_timer.start(1000)
+
+    def toggle_volume_control(self):
+        """Показывает/скрывает панель управления громкостью"""
+        if self.volume_widget.isVisible():
+            self.hide_volume_control()
+        else:
+            self.show_volume_control()
+
+    def show_volume_control(self):
+        """Показывает панель управления громкостью с анимацией"""
+        # Обновляем текущее значение громкости
+        self.volume_widget.update_volume()
+        
+        # Устанавливаем начальную позицию (невидимая, за экраном справа)
+        start_pos = QPoint(self.width(), self.height() - 170)
+        end_pos = QPoint(self.width() - 370, self.height() - 170)
+        
+        self.volume_widget.move(start_pos)
+        self.volume_widget.show()
+        self.volume_widget.raise_()
+        
+        # Анимация появления
+        self.volume_animation = QPropertyAnimation(self.volume_widget, b"pos")
+        self.volume_animation.setDuration(200)
+        self.volume_animation.setStartValue(start_pos)
+        self.volume_animation.setEndValue(end_pos)
+        self.volume_animation.setEasingCurve(QEasingCurve.Type.OutQuad)
+        self.volume_animation.start()
+
+    def hide_volume_control(self):
+        """Скрывает панель управления громкостью с анимацией"""
+        start_pos = self.volume_widget.pos()
+        end_pos = QPoint(self.width(), self.height() - 170)
+        
+        # Анимация исчезновения
+        self.volume_animation = QPropertyAnimation(self.volume_widget, b"pos")
+        self.volume_animation.setDuration(200)
+        self.volume_animation.setStartValue(start_pos)
+        self.volume_animation.setEndValue(end_pos)
+        self.volume_animation.setEasingCurve(QEasingCurve.Type.InQuad)
+        self.volume_animation.finished.connect(self.volume_widget.hide)
+        self.volume_animation.start()
+
+    def update_volume_icon(self):
+        """Обновляет иконку громкости в зависимости от текущего уровня"""
+        try:
+            devices = AudioUtilities.GetSpeakers()
+            interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
+            volume = cast(interface, POINTER(IAudioEndpointVolume))
+            current_volume = volume.GetMasterVolumeLevelScalar()
+            
+            # Выбираем соответствующую иконку
+            if current_volume <= 0:
+                icon_name = "volume_mute.png"
+            elif current_volume < 0.33:
+                icon_name = "volume_low.png"
+            elif current_volume < 0.66:
+                icon_name = "volume_medium.png"
+            else:
+                icon_name = "volume.png"
+                
+            icon_path = os.path.join("bin", "icons", "local_icons", "system", icon_name)
+            if os.path.exists(icon_path):
+                self.volume_icon.setPixmap(QIcon(icon_path).pixmap(30, 30))
+        except:
+            pass
 
 
     def show_death_screen(self, error_message):
         """Показывает экран смерти с сообщением об ошибке."""
         self.death_screen = DeathScreen(self, error_message)
         self.death_screen.show()
+    
+    
+    def create_time_button(self):
+        """Создает кнопку с временем и датой в правом нижнем углу"""
+        # Создаем контейнер для кнопки
+        self.time_button_container = QWidget(self)
+        self.time_button_container.setFixedSize(120, 60)
+        self.time_button_container.move(
+            self.width() - 120,  # Правый край с отступом
+            self.height() - 65   # Нижний край с отступом
+        )
+        
+        # Вертикальный лэйаут для кнопки
+        layout = QVBoxLayout(self.time_button_container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        # Создаем кнопку
+        self.time_button = QPushButton()
+        self.time_button.setFixedSize(120, 60)
+        self.time_button.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0.25);
+                border-radius: 16px;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                padding: 0;
+                color: white;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.35);
+            }
+        """)
+        
+        # Лэйаут для текста внутри кнопки
+        text_layout = QVBoxLayout(self.time_button)
+        text_layout.setContentsMargins(5, 5, 5, 5)
+        text_layout.setSpacing(0)
+        
+        # Метка для времени
+        self.time_button_time = QLabel()
+        self.time_button_time.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.time_button_time.setStyleSheet("""
+            QLabel {
+                color: white;
+                font-size: 14px;
+                font-weight: bold;
+            }
+        """)
+        
+        # Метка для даты
+        self.time_button_date = QLabel()
+        self.time_button_date.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.time_button_date.setStyleSheet("""
+            QLabel {
+                color: white;
+                font-size: 14px;
+            }
+        """)
+        
+        text_layout.addWidget(self.time_button_time)
+        text_layout.addWidget(self.time_button_date)
+        
+        layout.addWidget(self.time_button)
+        
+        # Создаем виджет календаря (изначально скрыт)
+        self.calendar_widget = CalendarWidget()
+        self.calendar_widget.setParent(self)
+        self.calendar_widget.setFixedSize(350, 350)
+        self.calendar_widget.move(
+            self.width() - 370,  # Позиционируем слева от кнопки
+            self.height() - 420  # Позиционируем выше кнопки
+        )
+        self.calendar_widget.hide()
+        
+        # Подключаем клик по кнопке времени
+        self.time_button.clicked.connect(self.toggle_calendar)
+        
+        # Обновляем время сразу
+        self.update_time_button()
+        
+        # Таймер для обновления времени каждую секунду
+        self.time_button_timer = QTimer(self)
+        self.time_button_timer.timeout.connect(self.update_time_button)
+        self.time_button_timer.start(1000)
 
+    def toggle_calendar(self):
+        """Показывает/скрывает календарь"""
+        if self.calendar_widget.isVisible():
+            self.hide_calendar()
+        else:
+            self.show_calendar()
+
+    def show_calendar(self):
+        """Показывает календарь с анимацией"""
+        # Устанавливаем начальную позицию (невидимая, за экраном справа)
+        start_pos = QPoint(self.width(), self.height() - 350)
+        end_pos = QPoint(self.width() - 370, self.height() - 420)
+        
+        self.calendar_widget.move(start_pos)
+        self.calendar_widget.show()
+        self.calendar_widget.raise_()
+        
+        # Устанавливаем флаг, чтобы предотвратить немедленное закрытие
+        self.calendar_widget.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+        
+        # Анимация появления
+        self.calendar_animation = QPropertyAnimation(self.calendar_widget, b"pos")
+        self.calendar_animation.setDuration(200)
+        self.calendar_animation.setStartValue(start_pos)
+        self.calendar_animation.setEndValue(end_pos)
+        self.calendar_animation.setEasingCurve(QEasingCurve.Type.OutQuad)
+        self.calendar_animation.start()
+
+    def hide_calendar(self):
+        """Скрывает календарь с анимацией"""
+        start_pos = self.calendar_widget.pos()
+        end_pos = QPoint(self.width(), self.height() - 350)
+        
+        # Анимация исчезновения
+        self.calendar_animation = QPropertyAnimation(self.calendar_widget, b"pos")
+        self.calendar_animation.setDuration(200)
+        self.calendar_animation.setStartValue(start_pos)
+        self.calendar_animation.setEndValue(end_pos)
+        self.calendar_animation.setEasingCurve(QEasingCurve.Type.InQuad)
+        self.calendar_animation.finished.connect(self.calendar_widget.hide)
+        self.calendar_animation.start()
+    
+    def update_time_button(self):
+        """Обновляет текст на кнопке времени"""
+        current_time = QTime.currentTime()
+        current_date = QDate.currentDate()
+        
+        # Форматируем время и дату
+        time_text = current_time.toString("hh:mm:ss")
+        date_text = current_date.toString("dd.MM.yyyy")
+        
+        # Устанавливаем текст
+        self.time_button_time.setText(time_text)
+        self.time_button_date.setText(date_text)
+
+
+    def resizeEvent(self, event):
+        """Обновляет позицию элементов при изменении размера окна"""
+        super().resizeEvent(event)
+        if hasattr(self, 'time_button_container'):
+            self.time_button_container.move(
+                self.width() - 120,
+                self.height() - 65
+            )
+        if hasattr(self, 'volume_button_container'):
+            self.volume_button_container.move(
+                self.width() - 190,
+                self.height() - 65
+            )
+        if hasattr(self, 'calendar_widget') and self.calendar_widget.isVisible():
+            self.calendar_widget.move(
+                self.width() - 370,
+                self.height() - 420
+            )
+        if hasattr(self, 'volume_widget') and self.volume_widget.isVisible():
+            self.volume_widget.move(
+                self.width() - 370,
+                self.height() - 140
+            )
+        self.load_background_image()
 
     def create_lock_screen(self):
         """Создает экран блокировки."""
@@ -533,29 +1180,6 @@ class MacOSWindow(QMainWindow):
             scaled_pixmap.height()
         )
 
-        # Прогресс-бар
-        # self.progress_bar = QProgressBar(self.splash_widget)
-        # self.progress_bar.setGeometry(
-        #     (self.width() - 300) // 2,  # Центрируем прогресс-бар по горизонтали
-        #     logo_label.y() + logo_label.height() + 20,  # Размещаем прогресс-бар под логотипом
-        #     300,  # Ширина прогресс-бара
-        #     20    # Высота прогресс-бара
-        # )
-        # self.progress_bar.setRange(0, 100)  # Устанавливаем диапазон от 0 до 100
-        # self.progress_bar.setValue(0)  # Начальное значение прогресс-бара
-        # self.progress_bar.setStyleSheet("""
-        #     QProgressBar {
-        #         border: 2px solid grey;
-        #         border-radius: 5px;
-        #         text-align: center;
-        #         background-color: black;
-        #     }
-        #     QProgressBar::chunk {
-        #         background-color: #05B8CC;
-        #         width: 10px;
-        #     }
-        # """)
-
         # Таймер для задержки перед анимацией
         self.timer = QTimer()
         self.timer.setSingleShot(True)  # Таймер сработает только один раз
@@ -698,6 +1322,10 @@ class MacOSWindow(QMainWindow):
             QMenuBar {
                 background-color: #D1D1D1;  /* Цвет, как у док-панели */
                 color: black;
+                background-color: rgba(255, 255, 255, 0.25);
+                border-radius: 16px;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                padding: 0;
                 font-size: 14px;
             }
             QMenuBar::item {
@@ -712,33 +1340,6 @@ class MacOSWindow(QMainWindow):
         # Меню "Win" (динамически изменяет название на активное окно)
         self.win_menu = menubar.addMenu("Win")
         self.update_win_menu("desktop")
-
-        # Меню "File"
-        file_menu = menubar.addMenu("File")
-        new_action = QAction("New", self)
-        open_action = QAction("Open", self)
-        file_menu.addAction(new_action)
-        file_menu.addAction(open_action)
-
-        # Меню "Edit"
-        edit_menu = menubar.addMenu("Edit")
-        cut_action = QAction("Cut", self)
-        copy_action = QAction("Copy", self)
-        paste_action = QAction("Paste", self)
-        edit_menu.addAction(cut_action)
-        edit_menu.addAction(copy_action)
-        edit_menu.addAction(paste_action)
-
-        # Меню "View"
-        view_menu = menubar.addMenu("View")
-        full_screen_action = QAction("Full Screen", self)
-        full_screen_action.triggered.connect(self.toggle_maximize_restore)
-        view_menu.addAction(full_screen_action)
-
-        # Меню "Tools"
-        tools_menu = menubar.addMenu("Tools")
-        settings_action = QAction("Settings", self)
-        tools_menu.addAction(settings_action)
 
         # Меню "Power" (Выключение и перезагрузка)
         power_menu = menubar.addMenu("Power")
@@ -932,7 +1533,8 @@ class MacOSWindow(QMainWindow):
             border: none;
         """)
         self.main_layout.addWidget(self.desktop)
-        
+
+
     def create_dock_panel(self):
         """Стилизация док-панели в стиле macOS с динамическим размером"""
         self.dock_buttons = {}
@@ -964,13 +1566,37 @@ class MacOSWindow(QMainWindow):
         dock_layout.setSpacing(15)
         dock_layout.setContentsMargins(10, 2, 10, 2)
 
-        # Конфигурация иконок
-        icons = [
-            ("app_store", "desktop"),
-            ("safari", "browser"),
-            ("settings", "settings"),
-            ("cmd", "cmd")
-        ]
+        # Чтение конфигурации из файла
+        dock_config_path = os.path.join("root", "bin", "dock.config")
+        icons = []
+        
+        try:
+            with open(dock_config_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#"):  # Пропускаем пустые строки и комментарии
+                        parts = line.split(":")
+                        if len(parts) >= 2:
+                            icon_name = parts[0].strip()
+                            window_name = parts[1].strip()
+                            icons.append((icon_name, window_name))
+        except FileNotFoundError:
+            print(f"Файл конфигурации {dock_config_path} не найден. Используются настройки по умолчанию.")
+            # Конфигурация по умолчанию
+            icons = [
+                ("app_store", "desktop"),
+                ("safari", "browser"),
+                ("settings", "settings"),
+                ("cmd", "cmd")
+            ]
+        except Exception as e:
+            print(f"Ошибка при чтении файла конфигурации: {e}")
+            icons = [
+                ("app_store", "desktop"),
+                ("safari", "browser"),
+                ("settings", "settings"),
+                ("cmd", "cmd")
+            ]
 
         button_size = 44  # Размер кнопки
         dock_padding = 20  # Отступы док-панели
@@ -1022,13 +1648,6 @@ class MacOSWindow(QMainWindow):
 
 
 
-
-
-
-    def resizeEvent(self, event):
-        """Обновление фона при изменении размера окна"""
-        self.load_background_image()
-        super().resizeEvent(event)
 
     def toggle_window(self, window_name):
         """

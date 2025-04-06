@@ -23,7 +23,7 @@ class SettingsWindow(DraggableResizableWindow):
         self.menu_list.setFixedWidth(180)  # Ограничиваем ширину списка
         self.menu_list.addItem("Общие")
         self.menu_list.addItem("Обновление системы")  # Добавляем новую вкладку
-        self.menu_list.addItem("Резервная копия ОС")  # Добавляем вкладку для резервной копии
+        # self.menu_list.addItem("Резервная копия ОС")  # Добавляем вкладку для резервной копии
         self.menu_list.setStyleSheet(""
             "background-color: #2E2E2E; color: white; font-size: 14px;"
             "border-right: 1px solid #555; padding: 5px;"

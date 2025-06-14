@@ -183,11 +183,17 @@ def update_application(branch="master"):
         return False
 
 def reboot_system():
+    """
+    Перезагружает систему.
+    """
     system_platform = platform.system()
     if system_platform == "Windows":
-        QProcess.startDetached("shutdown", ["/r", "/t", "0"])
+        # Команда для перезагрузки Windows
+        # os.system("shutdown /r /t 0")
+        QMessageBox.warning(self, "Ошибка", "Windows адаптер не найден")
     elif system_platform == "Linux":
-        QProcess.startDetached("reboot")
+        # Команда для перезагрузки Linux
+        os.system("reboot")
     else:
         print(f"Unsupported platform: {system_platform}")
 
@@ -209,7 +215,7 @@ def check_for_updates(branch="master"):
             progress_dialog.close()
 
             if update_application(branch):
-                print("Обновление завершено. Перезапустите приложение.")
+                print("Обновление завершено. Перезагруска .")
                 reboot_system()
             else:
                 print("Ошибка при обновлении.")

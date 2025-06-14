@@ -1012,7 +1012,7 @@ class MacOSWindow(QMainWindow):
         system_platform = platform.system()
         if system_platform == "Windows":
             # Команда для перезагрузки Windows
-            QProcess.startDetached("shutdown", ["/r", "/t", "0"])
+            pass
         elif system_platform == "Linux":
             # Команда для перезагрузки Linux
             QProcess.startDetached("reboot")

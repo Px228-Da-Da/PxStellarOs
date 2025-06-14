@@ -174,12 +174,28 @@ class SettingsWindow(DraggableResizableWindow):
                 f"Обновление завершено (ветка {self.branch_combo.currentText()}). Перезапустите ос."
             )
             self.rollback_button.setEnabled(True)
+            self.reboot_system()
         else:
             self.current_version_label.setText("Ошибка при обновлении. Попытка отката...")
             if self.rollback_update():
                 self.current_version_label.setText("Откат выполнен успешно.")
             else:
                 self.current_version_label.setText("Откат не удался.")
+
+    def reboot_system(self):
+        """
+        Перезагружает систему.
+        """
+        system_platform = platform.system()
+        if system_platform == "Windows":
+            # Команда для перезагрузки Windows
+            # os.system("shutdown /r /t 0")
+            QMessageBox.warning(self, "Ошибка", "Windows адаптер не найден")
+        elif system_platform == "Linux":
+            # Команда для перезагрузки Linux
+            os.system("reboot")
+        else:
+            print(f"Unsupported platform: {system_platform}")
 
 
     def create_system_backup(self):

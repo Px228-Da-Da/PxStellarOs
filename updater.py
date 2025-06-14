@@ -182,68 +182,27 @@ def update_application(branch="master"):
         print(f"Ошибка при обновлении приложения: {e}")
         return False
 
-def reboot_system():
-    """
-    Перезагружает систему.
-    """
-    system_platform = platform.system()
-    if system_platform == "Windows":
-        # Команда для перезагрузки Windows
-        # os.system("shutdown /r /t 0")
-        QMessageBox.warning(self, "Ошибка", "Windows адаптер не найден")
-    elif system_platform == "Linux":
-        # Команда для перезагрузки Linux
-        os.system("reboot")
-    else:
-        print(f"Unsupported platform: {system_platform}")
-
-def check_for_updates():
-    """
-    Проверяет обновления в обеих ветках (master и testing) 
-    и предлагает обновиться, если найдена новая версия
-    """
+def check_for_updates(branch="master"):
     current_version = get_current_version()
-    branches_to_check = ["master", "testing"]
-    latest_versions = {}
-    
-    # Проверяем версии во всех ветках
-    for branch in branches_to_check:
-        version = get_latest_version(branch)
-        if version:
-            latest_versions[branch] = version
-    
-    if not latest_versions:
-        print("Не удалось проверить обновления ни в одной ветке")
-        return
-    
-    # Находим самую новую версию среди всех веток
-    newest_branch = max(latest_versions.items(), key=lambda x: x[1])
-    branch_name, latest_version = newest_branch
-    
-    if latest_version > current_version:
+    latest_version = get_latest_version(branch)
+
+    if latest_version and latest_version > current_version:
         app = QApplication(sys.argv)
-        dialog = UpdateDialog(current_version, latest_version, branch_name.capitalize())
-        
+        dialog = UpdateDialog(current_version, latest_version, branch.capitalize())
         if dialog.exec() == QDialog.DialogCode.Accepted:
             progress_dialog = UpdateProgressDialog()
             progress_dialog.show()
-            
-            # Имитация прогресса
+
             for i in range(0, 101, 10):
                 QTimer.singleShot(i * 100, lambda i=i: progress_dialog.update_progress(i))
                 QApplication.processEvents()
-            
+
             progress_dialog.close()
-            
-            if update_application(branch_name):
-                print(f"Обновление из ветки {branch_name} завершено. Перезагрузка...")
-                reboot_system()
+
+            if update_application(branch):
+                print("Обновление завершено. Перезагруска.")
             else:
-                print(f"Ошибка при обновлении из ветки {branch_name}")
-    elif latest_version == current_version:
-        print(f"У вас уже установлена последняя версия ({current_version})")
-    else:
-        print(f"Ваша версия ({current_version}) новее, чем в проверенных ветках")
+                print("Ошибка при обновлении.")
 
 if __name__ == "__main__":
     print("Запуск приложения...")

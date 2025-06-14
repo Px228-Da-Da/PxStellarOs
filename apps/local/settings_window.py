@@ -6,6 +6,7 @@ from apps.local.init import DraggableResizableWindow
 from updater import get_current_version, get_latest_version, update_application, UPDATE_BRANCHES
 import shutil
 import os
+import platform
 import datetime
 
 class SettingsWindow(DraggableResizableWindow):

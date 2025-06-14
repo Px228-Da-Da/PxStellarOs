@@ -1,15 +1,21 @@
 import subprocess
 import sys
+import json
+import pywifi
+from pywifi import const
+import time
+import os
+import platform
+import traceback
 
-# Функція для перевірки та установки пакунків
+# Установка пакетов
 def install_package(package_name):
     try:
         subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
-        self.reboot_system()
     except subprocess.CalledProcessError:
         print(f"Не вдалося встановити {package_name}")
 
-# Перевірка і установка PyQt6 та PyQt6-WebEngine
+# Проверка и установка PyQt6 и PyQt6-WebEngine
 try:
     import PyQt6
 except ImportError:
@@ -20,548 +26,58 @@ try:
 except ImportError:
     install_package("PyQt6-WebEngine")
 
+# Добавьте новый импорт для PulseAudio
+# try:
+#     import pulsectl
+# except ImportError:
+#     subprocess.check_call([sys.executable, "-m", "pip", "install", "pulsectl"])
+#     import pulsectl
 
-from PyQt6.QtWidgets import QSlider  # Add this with other imports
-from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
-from comtypes import CLSCTX_ALL
-from ctypes import cast, POINTER
-from PyQt6.QtWidgets import QFrame, QPushButton, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QGraphicsDropShadowEffect
-from PyQt6.QtCore import QPropertyAnimation, QEasingCurve, QRect, Qt, QSize
-from PyQt6.QtGui import QIcon, QColor, QEnterEvent, QMouseEvent
-from PyQt6.QtCore import QTimer, QTime, QDate
+# PyQt6 импорты
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QVBoxLayout, QPushButton, QWidget, QHBoxLayout, QFrame, QLabel, QMessageBox, QStackedWidget, QMenuBar, QToolBar, QLineEdit,QTabWidget, QMenu
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QFrame, QPushButton,
+    QLabel, QMessageBox, QStackedWidget, QMenuBar, QToolBar, QLineEdit, QTabWidget, QMenu,
+    QTextEdit, QCalendarWidget, QListWidget, QListWidgetItem, QProgressBar, QGridLayout, QGraphicsDropShadowEffect, QSlider
 )
-from PyQt6.QtWidgets import QCalendarWidget
-from PyQt6.QtGui import QKeyEvent
-from PyQt6.QtCore import Qt, QSize, QUrl, QPoint
-from PyQt6.QtGui import QCursor, QIcon, QPixmap, QMouseEvent, QColor, QPainter, QBrush, QFont
 from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtGui import QAction
-from PyQt6.QtWidgets import QGraphicsDropShadowEffect
-from PyQt6.QtCore import QTimer, QTime, QDate
-from PyQt6.QtGui import QAction, QFont
-from PyQt6.QtWidgets import QLabel, QMenuBar
-from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout, QTextEdit, QLineEdit, QPushButton, QHBoxLayout
-from PyQt6.QtCore import QProcess
-from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout, QTextEdit, QLineEdit, QPushButton, QHBoxLayout
-from PyQt6.QtCore import QProcess
-from PyQt6.QtWidgets import QApplication, QWidget, QProgressBar, QVBoxLayout, QLabel
-from PyQt6.QtGui import QPixmap
-from PyQt6.QtCore import Qt, QTimer
-import os
-import platform  # Добавьте этот импорт
+from PyQt6.QtGui import (
+    QIcon, QColor, QEnterEvent, QMouseEvent, QKeyEvent, QCursor, QPixmap,
+    QPainter, QBrush, QFont, QAction
+)
+from PyQt6.QtCore import (
+    Qt, QSize, QRect, QPropertyAnimation, QEasingCurve, QTimer,
+    QTime, QDate, QUrl, QPoint, QProcess, pyqtProperty
+)
 
-
-
-
-
+# Пути и модули проекта
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin", "sys", "class_")))
 from TerminalApp import TerminalApp
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin", "sys", "class_", "win", "system_class", "animations")))
+from JumpingButton import JumpingButton
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin", "sys", "class_", "win", "system_class", "errors")))
+from DeathScreen import DeathScreen
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin", "sys", "class_", "win", "system_class", "styles")))
+from ToggleSwitch import ToggleSwitch
+from Input import Input
+
+
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin", "sys", "class_", "win", "Widgets")))
+from CalendarWidget import CalendarWidget
+from VolumeControlWidget import VolumeControlWidget
+from WifiWindow import WifiWindow
+
 
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "apps", "local")))
 from init import DraggableResizableWindow
-
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "apps", "local")))
-
-icon_dir_PATH = os.path.join("bin", "icons", "local_icons", "IconOs", f"OS.png")
-
 from cmd_window import CmdWindow
 from browser_window import BrowserWindow
 from settings_window import SettingsWindow
 
+
 from updater import UpdateDialog
 from updater import *
-
-import traceback
-
-import os
-from PyQt6.QtWidgets import QMainWindow, QApplication, QLabel, QWidget, QVBoxLayout
-from PyQt6.QtGui import QPixmap, QCursor
-from PyQt6.QtCore import Qt, QPropertyAnimation, QRect, QTimer
-from PyQt6.QtWidgets import QGridLayout
-
-class JumpingButton(QPushButton):
-    def __init__(self, icon_path=None, parent=None):
-        super().__init__(parent)
-        self.animation = QPropertyAnimation(self, b"geometry")
-        self.animation.setDuration(200)
-        self.animation.setEasingCurve(QEasingCurve.Type.OutQuad)
-        self.is_animating = False
-        self.default_size = 44
-        self.setFixedSize(self.default_size, self.default_size)
-        self.original_geometry = None
-
-        if icon_path:
-            self.setIcon(QIcon(icon_path))
-            self.setIconSize(QSize(self.default_size, self.default_size))
-
-        self.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                border: none;
-                border-radius: 8px;
-                padding: 0;
-                margin: 0;
-            }
-            QPushButton:hover {
-                background: rgba(255, 255, 255, 0.15);
-            }
-        """)
-
-    def enterEvent(self, event: QEnterEvent):
-        if not self.is_animating:
-            self.original_geometry = self.geometry()
-            self.animateJump(-10)
-        super().enterEvent(event)
-
-    def leaveEvent(self, event):
-        if not self.is_animating:
-            self.animateJump(10)
-        super().leaveEvent(event)
-
-    def mousePressEvent(self, event: QMouseEvent):
-        if not self.is_animating:
-            self.animateJump(-20, True)
-        super().mousePressEvent(event)
-
-    def animateJump(self, offset, is_click=False):
-        if self.original_geometry is None:
-            self.original_geometry = self.geometry()
-
-        self.is_animating = True
-        start_rect = self.geometry()
-        end_rect = QRect(start_rect.x(), self.original_geometry.y() + offset, start_rect.width(), start_rect.height())
-        self.animation.setStartValue(start_rect)
-        self.animation.setEndValue(end_rect)
-        self.animation.finished.connect(lambda: self.resetPosition(is_click))
-        self.animation.start()
-
-    def resetPosition(self, is_click):
-        self.animation.setStartValue(self.geometry())
-        self.animation.setEndValue(self.original_geometry)
-        self.animation.finished.disconnect()
-        self.animation.finished.connect(self.onAnimationFinished)
-        self.animation.start()
-
-    def onAnimationFinished(self):
-        self.is_animating = False
-        self.animation.finished.disconnect()
-
-class DeathScreen(QWidget):
-    def __init__(self, parent=None, error_message="Unknown error"):
-        super().__init__(parent)
-        self.setGeometry(0, 0, parent.width(), parent.height())
-        self.setStyleSheet("background-color: black; color: white;")
-        
-        # Основной лэйаут
-        layout = QVBoxLayout()
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
-        # Сообщение об ошибке
-        self.error_label = QLabel(f"Your OS ran into a problem and needs to restart.\n\nError: {error_message}")
-        self.error_label.setFont(QFont("Arial", 16))
-        self.error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.error_label)
-        
-        # Кнопка для перезагрузки
-        self.reboot_button = QPushButton("Reboot Now")
-        self.reboot_button.setFont(QFont("Arial", 14))
-        self.reboot_button.setStyleSheet("""
-            QPushButton {
-                background-color: #0078D7;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #005BB5;
-            }
-        """)
-        self.reboot_button.clicked.connect(self.reboot_system)
-        layout.addWidget(self.reboot_button, alignment=Qt.AlignmentFlag.AlignCenter)
-        
-        self.setLayout(layout)
-        
-        # Анимация появления экрана смерти
-        self.animation = QPropertyAnimation(self, b"geometry")
-        self.animation.setDuration(1000)
-        self.animation.setStartValue(QRect(0, -self.height(), self.width(), self.height()))
-        self.animation.setEndValue(QRect(0, 0, self.width(), self.height()))
-        self.animation.start()
-    
-    def reboot_system(self):
-        """Перезагружает систему."""
-        system_platform = platform.system()
-        if system_platform == "Windows":
-            # Команда для перезагрузки Windows
-            QProcess.startDetached("shutdown", ["/r", "/t", "0"])
-        elif system_platform == "Linux":
-            # Команда для перезагрузки Linux
-            QProcess.startDetached("reboot")
-        else:
-            print(f"Unsupported platform: {system_platform}")
-
-class CalendarWidget(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Календарь в стиле Windows 11")
-        self.resize(350, 350)
-        self.setStyleSheet("""
-            QWidget {
-                background-color: rgba(30, 30, 30, 0.9);
-                color: white;
-                border-radius: 8px;
-            }
-            QPushButton {
-                background-color: transparent;
-                color: white;
-                font-size: 18px;
-                border: none;
-                padding: 5px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: rgba(255, 255, 255, 0.1);
-            }
-            QPushButton:pressed {
-                background-color: rgba(255, 255, 255, 0.2);
-            }
-            #header {
-                background-color: transparent;
-                color: white;
-                border-top-left-radius: 8px;
-                border-top-right-radius: 8px;
-                padding: 10px;
-            }
-            #monthYearLabel {
-                font-size: 16px;
-                font-weight: bold;
-                color: white;
-            }
-            #weekdays {
-                font-size: 12px;
-                font-weight: bold;
-                color: rgba(255, 255, 255, 0.8);
-                padding: 5px 0;
-            }
-            .day {
-                font-size: 14px;
-                border-radius: 4px;
-                min-width: 30px;
-                min-height: 30px;
-                color: white;
-            }
-            .day:hover {
-                background-color: rgba(255, 255, 255, 0.1);
-            }
-            .current-day {
-                background-color: rgba(255, 255, 255, 0.3);
-                color: white;
-                font-weight: bold;
-            }
-            .selected-day {
-                background-color: rgba(255, 255, 255, 0.4);
-                color: white;
-                font-weight: bold;
-            }
-            .other-month {
-                color: rgba(255, 255, 255, 0.5);
-            }
-            .nav-button {
-                border-radius: 4px;
-                padding: 5px 10px;
-                font-size: 16px;
-            }
-            .nav-button:hover {
-                background-color: rgba(255, 255, 255, 0.2);
-            }
-        """)
-        
-        # Добавляем эффект тени
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 150))
-        shadow.setOffset(0, 4)
-        self.setGraphicsEffect(shadow)
-        
-        self.current_date = QDate.currentDate()
-        self.selected_date = None
-        self.initUI()
-        
-    def mousePressEvent(self, event):
-        # Если клик был за пределами виджета, закрываем его
-        if not self.rect().contains(event.pos()):
-            self.close()
-        super().mousePressEvent(event)
-        
-    def initUI(self):
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
-        
-        # Header with month/year and navigation
-        header = QWidget()
-        header.setObjectName("header")
-        header_layout = QHBoxLayout(header)
-        
-        self.prev_month_btn = QPushButton("◀")
-        self.prev_month_btn.setObjectName("nav-button")
-        self.prev_month_btn.clicked.connect(self.prev_month)
-        
-        self.month_year_label = QLabel()
-        self.month_year_label.setObjectName("monthYearLabel")
-        self.month_year_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        
-        self.next_month_btn = QPushButton("▶")
-        self.next_month_btn.setObjectName("nav-button")
-        self.next_month_btn.clicked.connect(self.next_month)
-        
-        header_layout.addWidget(self.prev_month_btn)
-        header_layout.addWidget(self.month_year_label, 1)
-        header_layout.addWidget(self.next_month_btn)
-        
-        main_layout.addWidget(header)
-        
-        # Weekdays header
-        weekdays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
-        weekdays_widget = QWidget()
-        weekdays_widget.setObjectName("weekdays")
-        weekdays_layout = QHBoxLayout(weekdays_widget)
-        weekdays_layout.setContentsMargins(0, 5, 0, 5)
-        weekdays_layout.setSpacing(0)
-        
-        for day in weekdays:
-            label = QLabel(day)
-            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            weekdays_layout.addWidget(label)
-        
-        main_layout.addWidget(weekdays_widget)
-        
-        # Calendar grid - 6 строк
-        self.calendar_grid = QGridLayout()
-        self.calendar_grid.setHorizontalSpacing(0)
-        self.calendar_grid.setVerticalSpacing(0)
-        self.calendar_grid.setContentsMargins(5, 5, 5, 5)
-        
-        main_layout.addLayout(self.calendar_grid)
-        
-        self.update_calendar()
-        
-    def update_calendar(self):
-        # Update month/year label
-        month = self.current_date.toString("MMMM")
-        year = self.current_date.toString("yyyy")
-        self.month_year_label.setText(f"{month} {year}")
-        
-        # Clear previous days
-        for i in reversed(range(self.calendar_grid.count())): 
-            self.calendar_grid.itemAt(i).widget().setParent(None)
-        
-        # Get first day of month and days in month
-        first_day = QDate(self.current_date.year(), self.current_date.month(), 1)
-        days_in_month = first_day.daysInMonth()
-        
-        # Get the weekday of the first day (1 = Monday, 7 = Sunday)
-        start_day = first_day.dayOfWeek()
-        
-        # Get days from previous month to show
-        prev_month = first_day.addMonths(-1)
-        days_in_prev_month = prev_month.daysInMonth()
-        
-        # Fill the grid with exactly 6 weeks (42 days)
-        day_counter = 1
-        current_row = 0
-        
-        # Previous month days
-        prev_month_days_to_show = start_day - 1
-        prev_month_start_day = days_in_prev_month - prev_month_days_to_show + 1
-        
-        for i in range(prev_month_days_to_show):
-            day = prev_month_start_day + i
-            btn = QPushButton(str(day))
-            btn.setProperty("class", "other-month")
-            btn.setCursor(Qt.CursorShape.ArrowCursor)
-            self.calendar_grid.addWidget(btn, current_row, i % 7)
-            
-            if (i + 1) % 7 == 0:
-                current_row += 1
-        
-        # Current month days
-        current_day = QDate.currentDate()
-        for day in range(1, days_in_month + 1):
-            btn = QPushButton(str(day))
-            btn.setProperty("class", "day")
-            
-            # Check if this day is selected
-            is_selected = (self.selected_date and 
-                          day == self.selected_date.day() and 
-                          self.current_date.month() == self.selected_date.month() and 
-                          self.current_date.year() == self.selected_date.year())
-            
-            # Check if this is current day
-            is_current = (day == current_day.day() and 
-                         self.current_date.month() == current_day.month() and 
-                         self.current_date.year() == current_day.year())
-            
-            if is_selected:
-                btn.setProperty("class", "selected-day")
-            elif is_current:
-                btn.setProperty("class", "current-day")
-            
-            btn.clicked.connect(lambda _, d=day: self.day_clicked(d))
-            
-            col = (prev_month_days_to_show + day - 1) % 7
-            row = (prev_month_days_to_show + day - 1) // 7
-            
-            self.calendar_grid.addWidget(btn, row, col)
-            day_counter += 1
-        
-        # Next month days to fill exactly 6 weeks (42 cells)
-        next_month_days_needed = 42 - (prev_month_days_to_show + days_in_month)
-        next_month = first_day.addMonths(1)
-        
-        for i in range(1, next_month_days_needed + 1):
-            btn = QPushButton(str(i))
-            btn.setProperty("class", "other-month")
-            btn.setCursor(Qt.CursorShape.ArrowCursor)
-            
-            total_days_shown = prev_month_days_to_show + days_in_month + i - 1
-            col = total_days_shown % 7
-            row = total_days_shown // 7
-            
-            self.calendar_grid.addWidget(btn, row, col)
-    
-    def day_clicked(self, day):
-        self.selected_date = QDate(self.current_date.year(), self.current_date.month(), day)
-        self.update_calendar()
-    
-    def prev_month(self):
-        self.current_date = self.current_date.addMonths(-1)
-        self.update_calendar()
-    
-    def next_month(self):
-        self.current_date = self.current_date.addMonths(1)
-        self.update_calendar()
-    
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
-        # Draw rounded corners
-        rect = self.rect()
-        painter.setBrush(QBrush(QColor(30, 30, 30, 230)))
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRoundedRect(rect, 8, 8)
-
-class VolumeControlWidget(QWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Громкость")
-        self.resize(350, 100)  # Уменьшаем высоту по сравнению с календарем
-        self.setStyleSheet("""
-            QWidget {
-                background-color: rgba(30, 30, 30, 0.9);
-                color: white;
-                border-radius: 8px;
-            }
-            QSlider::groove:horizontal {
-                border: 1px solid #999999;
-                height: 6px;
-                background: rgba(255, 255, 255, 0.2);
-                border-radius: 3px;
-            }
-            QSlider::handle:horizontal {
-                background: #4bcfff;
-                border: 1px solid #5c5c5c;
-                width: 16px;
-                margin: -5px 0;
-                border-radius: 8px;
-            }
-            QSlider::sub-page:horizontal {
-                background: #4bcfff;
-            }
-            QLabel {
-                color: white;
-                font-size: 14px;
-            }
-        """)
-        
-        # Добавляем эффект тени
-        shadow = QGraphicsDropShadowEffect()
-        shadow.setBlurRadius(20)
-        shadow.setColor(QColor(0, 0, 0, 150))
-        shadow.setOffset(0, 4)
-        self.setGraphicsEffect(shadow)
-        
-        # Инициализация аудио
-        try:
-            devices = AudioUtilities.GetSpeakers()
-            interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-            self.volume = cast(interface, POINTER(IAudioEndpointVolume))
-        except Exception as e:
-            print(f"Audio initialization error: {e}")
-            self.volume = None
-        
-        # Основной лэйаут
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(10, 10, 10, 10)
-        main_layout.setSpacing(10)
-        
-        # Заголовок
-        self.title_label = QLabel("Громкость")
-        self.title_label.setStyleSheet("font-size: 16px; font-weight: bold;")
-        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(self.title_label)
-        
-        # Ползунок громкости
-        self.volume_slider = QSlider(Qt.Orientation.Horizontal)
-        self.volume_slider.setRange(0, 100)
-        self.volume_slider.valueChanged.connect(self.set_system_volume)
-        main_layout.addWidget(self.volume_slider)
-        
-        # Метка с текущим уровнем громкости
-        self.volume_label = QLabel("100%")
-        self.volume_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(self.volume_label)
-        
-        # Устанавливаем текущее значение громкости
-        self.update_volume()
-    
-    def update_volume(self):
-        """Обновляет ползунок и метку текущей громкостью"""
-        try:
-            if self.volume:
-                current_volume = self.volume.GetMasterVolumeLevelScalar()
-                volume_percent = int(current_volume * 100)
-                self.volume_slider.setValue(volume_percent)
-                self.volume_label.setText(f"{volume_percent}%")
-        except Exception as e:
-            print(f"Volume update error: {e}")
-    
-    def set_system_volume(self, value):
-        """Устанавливает системную громкость"""
-        try:
-            if self.volume:
-                volume_level = value / 100.0
-                self.volume.SetMasterVolumeLevelScalar(volume_level, None)
-                self.volume_label.setText(f"{value}%")
-        except Exception as e:
-            print(f"Volume set error: {e}")
-    
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
-        # Draw rounded corners
-        rect = self.rect()
-        painter.setBrush(QBrush(QColor(30, 30, 30, 230)))
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRoundedRect(rect, 8, 8)
-
 
 def global_exception_handler(exctype, value, tb):
     """Глобальный обработчик исключений."""
@@ -584,13 +100,23 @@ def global_exception_handler(exctype, value, tb):
         sys.exit(temp_app.exec())
 
 
-
 class MacOSWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.is_locked = False  # Флаг для отслеживания состояния блокировки
         self.is_splash_screen_active = False  # Флаг для отслеживания состояния загрузочного экрана
         self.is_password_input_deleted = False
+        # Инициализация Wi-Fi
+        self.wifi = pywifi.PyWiFi()
+        self.iface = None
+        
+        try:
+            if self.wifi.interfaces():
+                self.iface = self.wifi.interfaces()[0]
+            else:
+                QMessageBox.warning(self, "Ошибка", "Wi-Fi адаптер не найден")
+        except Exception as e:
+            QMessageBox.warning(self, "Ошибка", f"Ошибка инициализации Wi-Fi: {str(e)}")
         try:
             self.desk_config = "root/user/desk/desk.config"
             self.active_windows = {}
@@ -630,6 +156,9 @@ class MacOSWindow(QMainWindow):
             
             # Рабочий стол (прозрачный)
             self.create_desktop_window()
+
+            # self.create_wifi_button()
+
             
             # Док-панель
             self.create_dock_panel()
@@ -750,28 +279,25 @@ class MacOSWindow(QMainWindow):
         self.volume_animation.start()
 
     def update_volume_icon(self):
-        """Обновляет иконку громкости в зависимости от текущего уровня"""
+        """Обновляет иконку громкости"""
         try:
-            devices = AudioUtilities.GetSpeakers()
-            interface = devices.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-            volume = cast(interface, POINTER(IAudioEndpointVolume))
-            current_volume = volume.GetMasterVolumeLevelScalar()
-            
-            # Выбираем соответствующую иконку
-            if current_volume <= 0:
-                icon_name = "volume_mute.png"
-            elif current_volume < 0.33:
-                icon_name = "volume_low.png"
-            elif current_volume < 0.66:
-                icon_name = "volume_medium.png"
-            else:
-                icon_name = "volume.png"
+            if hasattr(self, 'volume_widget') and self.volume_widget and self.volume_widget.volume:
+                current_volume = self.volume_widget.volume.GetMasterVolumeLevelScalar()
                 
-            icon_path = os.path.join("bin", "icons", "local_icons", "system", icon_name)
-            if os.path.exists(icon_path):
-                self.volume_icon.setPixmap(QIcon(icon_path).pixmap(30, 30))
-        except:
-            pass
+                if current_volume <= 0:
+                    icon_name = "volume_mute.png"
+                elif current_volume < 0.33:
+                    icon_name = "volume_low.png"
+                elif current_volume < 0.66:
+                    icon_name = "volume_medium.png"
+                else:
+                    icon_name = "volume.png"
+                    
+                icon_path = os.path.join("bin", "icons", "local_icons", "system", icon_name)
+                if os.path.exists(icon_path):
+                    self.volume_icon.setPixmap(QIcon(icon_path).pixmap(30, 30))
+        except Exception as e:
+            print(f"Volume icon update error: {e}")
 
 
     def show_death_screen(self, error_message):
@@ -933,6 +459,11 @@ class MacOSWindow(QMainWindow):
                 self.width() - 190,
                 self.height() - 65
             )
+        if hasattr(self, 'wifi_button_container'):
+            self.wifi_button_container.move(
+                self.width() - 260,
+                self.height() - 65
+            )
         if hasattr(self, 'calendar_widget') and self.calendar_widget.isVisible():
             self.calendar_widget.move(
                 self.width() - 370,
@@ -942,6 +473,11 @@ class MacOSWindow(QMainWindow):
             self.volume_widget.move(
                 self.width() - 370,
                 self.height() - 140
+            )
+        if hasattr(self, 'wifi_window') and self.wifi_window.isVisible():
+            self.wifi_window.move(
+                self.width() - 370,
+                self.height() - 520
             )
         self.load_background_image()
 
@@ -976,31 +512,42 @@ class MacOSWindow(QMainWindow):
             scaled_pixmap.height()
         )
 
+        # Метка для отображения времени (часы:минуты:секунды)
+        self.time_label = QLabel(self.lock_widget)
+        self.time_label.setStyleSheet("""
+            QLabel {
+                color: white;
+                font-size: 18px;
+                font-weight: bold;
+                background-color: rgba(0, 0, 0, 100);
+                padding: 5px 10px;
+                border-radius: 5px;
+            }
+        """)
+        self.time_label.setGeometry(10, 10, 150, 30)  # Левый верхний угол
+        self.update_time_label()  # Установить начальное значение
+
+        # Таймер для обновления времени каждую секунду
+        self.clock_timer = QTimer(self)
+        self.clock_timer.timeout.connect(self.update_time_label)
+        self.clock_timer.start(1000)  # 1000 мс = 1 секунда
+
         # Поле ввода пароля
-        self.password_input = QLineEdit(self.lock_widget)
+        self.password_input = Input(
+            parent=self.lock_widget,
+            placeholder_text="Password",
+            initial_text="",  # Можно указать заранее введённый текст, если нужно
+            echo_mode=QLineEdit.EchoMode.Password  # Или QLineEdit.EchoMode.Normal для обычного текста
+        )
         self.password_input.setGeometry(
             (self.width() - 200) // 2,
             logo_label.y() + logo_label.height() + 20,
             200,
             30
         )
-        self.password_input.setPlaceholderText("Password")
-        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
-        self.password_input.setStyleSheet("""
-            QLineEdit {
-                border: 2px solid #555;
-                border-radius: 5px;
-                padding: 5px;
-                background-color: rgba(0, 0, 0, 150);
-                color: white;
-                font-size: 14px;
-            }
-            QLineEdit:focus {
-                border: 2px solid #0078D7;
-            }
-        """)
         self.password_input.returnPressed.connect(self.unlock_screen)
         self.password_input.setFocus()
+
 
         # Добавляем кнопку с картинкой 50x50
         self.main_button = QPushButton(self.lock_widget)
@@ -1091,6 +638,11 @@ class MacOSWindow(QMainWindow):
         self.additional_buttons_container.enterEvent = self.additional_buttons_enter_event
         self.additional_buttons_container.leaveEvent = self.additional_buttons_leave_event
 
+    def update_time_label(self):
+        current_time = QTime.currentTime().toString("HH:mm:ss")
+        self.time_label.setText(current_time)
+
+
     def additional_buttons_enter_event(self, event):
         """Обработчик события, когда курсор входит в область контейнера."""
         # Ничего не делаем, контейнер остается видимым
@@ -1134,14 +686,20 @@ class MacOSWindow(QMainWindow):
         # Проверяем, существует ли объект password_input
         try:
             # Проверяем пароль (например, пароль "0000")
-            if self.password_input.text() == "":  # Пустой пароль для примера
-                self.is_locked = False  # Снимаем флаг блокировки
+            if self.password_input.text() == "":
+                self.is_locked = False
 
-                # Запускаем анимацию разблокировки
+                # Остановить и удалить таймер и метку времени
+                if hasattr(self, "clock_timer"):
+                    self.clock_timer.stop()
+                    self.clock_timer.deleteLater()
+
                 self.animation = QPropertyAnimation(self.lock_widget, b"geometry")
-                self.animation.setDuration(200)  # Длительность анимации 0.5 секунды
+                self.animation.setDuration(200)
                 self.animation.setStartValue(QRect(0, 0, self.width(), self.height()))
                 self.animation.setEndValue(QRect(0, -self.height(), self.width(), self.height()))
+                self.animation.finished.connect(self.lock_widget.deleteLater)
+                self.animation.start()
 
                 # Удаляем виджет после завершения анимации
                 self.animation.finished.connect(self.lock_widget.deleteLater)
@@ -1363,7 +921,8 @@ class MacOSWindow(QMainWindow):
         self.time_label = QLabel()
         self.time_label.setFont(QFont("Helvetica", 14))
         self.time_label.setStyleSheet("color: black; padding: 5px;")
-        self.update_time()  # Обновляем сразу при старте
+        # self.update_time()  # Обновляем сразу при старте
+        self.create_wifi_button()
 
         # Создание таймера для обновления времени
         self.timer = QTimer(self)
@@ -1503,12 +1062,176 @@ class MacOSWindow(QMainWindow):
         """
         Обновляет время и дату в метке.
         """
-        current_time = QTime.currentTime()
-        current_date = QDate.currentDate()
-        formatted_time = current_time.toString("hh:mm:ss")
-        formatted_date = current_date.toString("dddd, d MMM yyyy")
+        # current_time = QTime.currentTime()
+        # current_date = QDate.currentDate()
+        # self.time_label.setText(f"{current_time.toString('hh:mm:ss')}  {current_date.toString('dd.MM.yyyy')}")
+        pass
+
+    def create_wifi_button(self):
+        """Создает кнопку Wi-Fi в правом нижнем углу"""
+        # Создаем контейнер для кнопки
+        self.wifi_button_container = QWidget(self)
+        self.wifi_button_container.setFixedSize(60, 60)
+        self.wifi_button_container.move(
+            self.width() - 260,  # Позиция слева от кнопки громкости
+            self.height() - 65   # Такая же высота как у других кнопок
+        )
         
-        self.time_label.setText(f"{formatted_date} | {formatted_time}")
+        # Вертикальный лэйаут для кнопки
+        layout = QVBoxLayout(self.wifi_button_container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        # Создаем кнопку
+        self.wifi_button = QPushButton()
+        self.wifi_button.setFixedSize(60, 60)
+        self.wifi_button.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0.25);
+                border-radius: 16px;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                padding: 0;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.35);
+            }
+        """)
+        
+        # Иконка Wi-Fi
+        self.wifi_icon = QLabel(self.wifi_button)
+        self.wifi_icon.setPixmap(QIcon(os.path.join("bin", "icons", "local_icons", "system", "wifi.png")).pixmap(30, 30))
+        self.wifi_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.wifi_icon.setGeometry(15, 15, 30, 30)
+        
+        layout.addWidget(self.wifi_button)
+        
+        # Создаем виджет Wi-Fi (изначально скрыт)
+        self.wifi_window = WifiWindow()
+        self.wifi_window.setParent(self)
+        self.wifi_window.setStyleSheet("""
+            QWidget {
+                background-color: rgba(30, 30, 30, 0.9);
+                color: white;
+                border-radius: 8px;
+            }
+            QPushButton {
+                background-color: transparent;
+                color: white;
+                font-size: 18px;
+                border: none;
+                padding: 5px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.1);
+            }
+            QPushButton:pressed {
+                background-color: rgba(255, 255, 255, 0.2);
+            }
+            #header {
+                background-color: transparent;
+                color: white;
+                border-top-left-radius: 8px;
+                border-top-right-radius: 8px;
+                padding: 10px;
+            }
+            #monthYearLabel {
+                font-size: 16px;
+                font-weight: bold;
+                color: white;
+            }
+            #weekdays {
+                font-size: 12px;
+                font-weight: bold;
+                color: rgba(255, 255, 255, 0.8);
+                padding: 5px 0;
+            }
+            .day {
+                font-size: 14px;
+                border-radius: 4px;
+                min-width: 30px;
+                min-height: 30px;
+                color: white;
+            }
+            .day:hover {
+                background-color: rgba(255, 255, 255, 0.1);
+            }
+            .current-day {
+                background-color: rgba(255, 255, 255, 0.3);
+                color: white;
+                font-weight: bold;
+            }
+            .selected-day {
+                background-color: rgba(255, 255, 255, 0.4);
+                color: white;
+                font-weight: bold;
+            }
+            .other-month {
+                color: rgba(255, 255, 255, 0.5);
+            }
+            .nav-button {
+                border-radius: 4px;
+                padding: 5px 10px;
+                font-size: 16px;
+            }
+            .nav-button:hover {
+                background-color: rgba(255, 255, 255, 0.2);
+            }
+        """)
+        self.wifi_window.hide()
+        
+        # Подключаем клик по кнопке Wi-Fi
+        self.wifi_button.clicked.connect(self.toggle_wifi_control)
+        
+        # Добавляем эффект тени
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(20)
+        shadow.setColor(QColor(0, 0, 0, 150))
+        shadow.setOffset(0, 4)
+        self.wifi_window.setGraphicsEffect(shadow)
+
+    def toggle_wifi_control(self):
+        """Показывает/скрывает панель управления Wi-Fi"""
+        if self.wifi_window.isVisible():
+            self.hide_wifi_control()
+        else:
+            self.show_wifi_control()
+
+    def show_wifi_control(self):
+        """Показывает панель управления Wi-Fi с анимацией"""
+        # Обновляем список сетей
+        self.wifi_window.scan_networks()
+        
+        # Устанавливаем начальную позицию (невидимая, за экраном справа)
+        start_pos = QPoint(self.width(), self.height() - 520)
+        end_pos = QPoint(self.width() - 370, self.height() - 520)
+        
+        self.wifi_window.move(start_pos)
+        self.wifi_window.show()
+        self.wifi_window.raise_()
+        
+        # Анимация появления
+        self.wifi_animation = QPropertyAnimation(self.wifi_window, b"pos")
+        self.wifi_animation.setDuration(200)
+        self.wifi_animation.setStartValue(start_pos)
+        self.wifi_animation.setEndValue(end_pos)
+        self.wifi_animation.setEasingCurve(QEasingCurve.Type.OutQuad)
+        self.wifi_animation.start()
+
+    def hide_wifi_control(self):
+        """Скрывает панель управления Wi-Fi с анимацией"""
+        start_pos = self.wifi_window.pos()
+        end_pos = QPoint(self.width(), self.height() - 520)
+        
+        # Анимация исчезновения
+        self.wifi_animation = QPropertyAnimation(self.wifi_window, b"pos")
+        self.wifi_animation.setDuration(200)
+        self.wifi_animation.setStartValue(start_pos)
+        self.wifi_animation.setEndValue(end_pos)
+        self.wifi_animation.setEasingCurve(QEasingCurve.Type.InQuad)
+        self.wifi_animation.finished.connect(self.wifi_window.hide)
+        self.wifi_animation.start()
+
     
     def toggle_maximize_restore(self):
         if self.isMaximized():
@@ -1821,5 +1544,4 @@ if __name__ == "__main__":
     except Exception as e:
         # Если ошибка произошла до создания окна, показываем её в DeathScreen через временное окно
         global_exception_handler(type(e), e, e.__traceback__)
-
 

@@ -164,7 +164,7 @@ class MacOSWindow(QMainWindow):
             self.create_dock_panel()
             self.create_time_button()
             # Создаем кнопку громкости
-            self.create_volume_button()
+            # self.create_volume_button()
             
             # Остальные элементы
             self.create_menu()
@@ -181,60 +181,60 @@ class MacOSWindow(QMainWindow):
             # Если ошибка происходит в конструкторе, показываем её в DeathScreen
             self.show_death_screen(f"Critical error in constructor: {str(e)}")
 
-    def create_volume_button(self):
-        """Создает кнопку громкости в правом нижнем углу"""
-        # Создаем контейнер для кнопки
-        self.volume_button_container = QWidget(self)
-        self.volume_button_container.setFixedSize(60, 60)
-        self.volume_button_container.move(
-            self.width() - 190,  # Позиция слева от кнопки времени
-            self.height() - 65   # Такая же высота как у кнопки времени
-        )
+    # def create_volume_button(self):
+    #     """Создает кнопку громкости в правом нижнем углу"""
+    #     # Создаем контейнер для кнопки
+    #     self.volume_button_container = QWidget(self)
+    #     self.volume_button_container.setFixedSize(60, 60)
+    #     self.volume_button_container.move(
+    #         self.width() - 190,  # Позиция слева от кнопки времени
+    #         self.height() - 65   # Такая же высота как у кнопки времени
+    #     )
         
-        # Вертикальный лэйаут для кнопки
-        layout = QVBoxLayout(self.volume_button_container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+    #     # Вертикальный лэйаут для кнопки
+    #     layout = QVBoxLayout(self.volume_button_container)
+    #     layout.setContentsMargins(0, 0, 0, 0)
+    #     layout.setSpacing(0)
         
-        # Создаем кнопку
-        self.volume_button = QPushButton()
-        self.volume_button.setFixedSize(60, 60)
-        self.volume_button.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(255, 255, 255, 0.25);
-                border-radius: 16px;
-                border: 1px solid rgba(255, 255, 255, 0.3);
-                padding: 0;
-            }
-            QPushButton:hover {
-                background-color: rgba(255, 255, 255, 0.35);
-            }
-        """)
+    #     # Создаем кнопку
+    #     self.volume_button = QPushButton()
+    #     self.volume_button.setFixedSize(60, 60)
+    #     self.volume_button.setStyleSheet("""
+    #         QPushButton {
+    #             background-color: rgba(255, 255, 255, 0.25);
+    #             border-radius: 16px;
+    #             border: 1px solid rgba(255, 255, 255, 0.3);
+    #             padding: 0;
+    #         }
+    #         QPushButton:hover {
+    #             background-color: rgba(255, 255, 255, 0.35);
+    #         }
+    #     """)
         
-        # Иконка громкости
-        self.volume_icon = QLabel(self.volume_button)
-        self.volume_icon.setPixmap(QIcon(os.path.join("bin", "icons", "local_icons", "system", "volume.png")).pixmap(30, 30))
-        self.volume_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.volume_icon.setGeometry(15, 15, 30, 30)
+    #     # Иконка громкости
+    #     self.volume_icon = QLabel(self.volume_button)
+    #     self.volume_icon.setPixmap(QIcon(os.path.join("bin", "icons", "local_icons", "system", "volume.png")).pixmap(30, 30))
+    #     self.volume_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    #     self.volume_icon.setGeometry(15, 15, 30, 30)
         
-        layout.addWidget(self.volume_button)
+    #     layout.addWidget(self.volume_button)
         
-        # Создаем виджет управления громкостью (изначально скрыт)
-        self.volume_widget = VolumeControlWidget()
-        self.volume_widget.setParent(self)
-        # self.volume_widget.move(
-        #     self.width() - 370,  # Позиционируем слева от кнопки
-        #     self.height() - 140  # Позиционируем выше кнопки
-        # )
-        self.volume_widget.hide()
+    #     # Создаем виджет управления громкостью (изначально скрыт)
+    #     self.volume_widget = VolumeControlWidget()
+    #     self.volume_widget.setParent(self)
+    #     # self.volume_widget.move(
+    #     #     self.width() - 370,  # Позиционируем слева от кнопки
+    #     #     self.height() - 140  # Позиционируем выше кнопки
+    #     # )
+    #     self.volume_widget.hide()
         
-        # Подключаем клик по кнопке громкости
-        self.volume_button.clicked.connect(self.toggle_volume_control)
+    #     # Подключаем клик по кнопке громкости
+    #     self.volume_button.clicked.connect(self.toggle_volume_control)
         
-        # Таймер для обновления иконки громкости
-        self.volume_timer = QTimer(self)
-        self.volume_timer.timeout.connect(self.update_volume_icon)
-        self.volume_timer.start(1000)
+    #     # Таймер для обновления иконки громкости
+    #     self.volume_timer = QTimer(self)
+    #     self.volume_timer.timeout.connect(self.update_volume_icon)
+    #     self.volume_timer.start(1000)
 
     def toggle_volume_control(self):
         """Показывает/скрывает панель управления громкостью"""

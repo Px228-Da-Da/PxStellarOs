@@ -12,12 +12,11 @@ from apps.local.init import DraggableResizableWindow
 
 # Пути к файлам с версией
 VERSION_FILE = "version.txt"
-# URL шаблоны для GitHub (используют {branch} для подстановки)
+# Шаблоны URL для разных веток
 GITHUB_VERSION_URL = "https://raw.githubusercontent.com/Px228-Da-Da/PxStellarOs/{branch}/version.txt"
 GITHUB_ZIP_URL = "https://github.com/Px228-Da-Da/PxStellarOs/archive/refs/heads/{branch}.zip"
 # Временная папка для распаковки
 TEMP_FOLDER = "temp_update"
-
 # Доступные ветки обновления
 UPDATE_BRANCHES = {
     "Master": "master",
@@ -39,7 +38,10 @@ class UpdateDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.label = QLabel(f"Доступна новая версия ({branch}): {latest_version}\nТекущая версия: {current_version}")
+        self.label = QLabel(
+            f"Доступна новая версия ({branch}): {latest_version}\n"
+            f"Текущая версия: {current_version}"
+        )
         self.label.setFont(QFont("Arial", 12))
         self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.label)

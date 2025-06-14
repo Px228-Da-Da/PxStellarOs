@@ -22,7 +22,6 @@ class SettingsWindow(DraggableResizableWindow):
         self.menu_list.setFixedWidth(180)
         self.menu_list.addItem("Общие")
         self.menu_list.addItem("Обновление системы")
-        self.menu_list.addItem("Резервная копия ОС")
         self.menu_list.setStyleSheet("""
             background-color: #2E2E2E; color: white; font-size: 14px;
             border-right: 1px solid #555; padding: 5px;
@@ -31,25 +30,22 @@ class SettingsWindow(DraggableResizableWindow):
         self.content_area = QStackedWidget()
         self.content_area.setStyleSheet("background-color: #3B3B3B; color: white; font-size: 14px;")
 
-        # Общие настройки
         general_page = QWidget()
         general_layout = QVBoxLayout(general_page)
         general_layout.addWidget(QLabel("Общие настройки"))
         general_layout.addWidget(QPushButton("Сохранить изменения"))
         self.content_area.addWidget(general_page)
 
-        # Обновление системы
         update_page = QWidget()
         update_layout = QVBoxLayout(update_page)
 
-        # Выбор ветки обновления
+        self.current_version_label = QLabel(f"Текущая версия: {get_current_version()}")
+        update_layout.addWidget(self.current_version_label)
+
         update_layout.addWidget(QLabel("Ветка обновления:"))
         self.branch_combo = QComboBox()
         self.branch_combo.addItems(UPDATE_BRANCHES.keys())
         update_layout.addWidget(self.branch_combo)
-
-        self.current_version_label = QLabel(f"Текущая версия: {get_current_version()}")
-        update_layout.addWidget(self.current_version_label)
 
         self.check_update_button = QPushButton("Проверить обновления")
         self.check_update_button.clicked.connect(self.check_for_updates)
@@ -67,7 +63,6 @@ class SettingsWindow(DraggableResizableWindow):
 
         self.content_area.addWidget(update_page)
 
-        # Резервная копия ОС
         backup_page = QWidget()
         backup_layout = QVBoxLayout(backup_page)
 
@@ -186,15 +181,19 @@ class SettingsWindow(DraggableResizableWindow):
             else:
                 self.current_version_label.setText("Откат не удался.")
 
+
     def create_system_backup(self):
+        """Создает резервную копию системы."""
         backup_dir = "system_backup"
         if not os.path.exists(backup_dir):
             os.makedirs(backup_dir)
         
+        # Создаем уникальное имя для резервной копии
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_name = f"backup_{timestamp}"
         backup_path = os.path.join(backup_dir, backup_name)
 
+        # Копируем текущую версию в папку резервной копии
         for item in os.listdir("."):
             if item != backup_dir:
                 s = os.path.join(".", item)
@@ -208,26 +207,26 @@ class SettingsWindow(DraggableResizableWindow):
         self.update_backup_info()
 
     def restore_system_backup(self):
+        """Восстанавливает систему из резервной копии."""
         backup_dir = "system_backup"
         if not os.path.exists(backup_dir):
             QMessageBox.warning(self, "Ошибка", "Резервные копии не найдены.")
             return
         
+        # Получаем список доступных резервных копий
         backups = os.listdir(backup_dir)
         if not backups:
             QMessageBox.warning(self, "Ошибка", "Резервные копии не найдены.")
             return
         
-        backup_name, ok = QInputDialog.getItem(
-            self, "Выбор резервной копии", 
-            "Выберите резервную копию для восстановления:", 
-            backups, 0, False
-        )
+        # Показываем диалог выбора резервной копии
+        backup_name, ok = QInputDialog.getItem(self, "Выбор резервной копии", "Выберите резервную копию для восстановления:", backups, 0, False)
         if not ok:
             return
         
         backup_path = os.path.join(backup_dir, backup_name)
         
+        # Удаляем текущую версию
         for item in os.listdir("."):
             if item != backup_dir:
                 if os.path.isdir(item):
@@ -235,6 +234,7 @@ class SettingsWindow(DraggableResizableWindow):
                 else:
                     os.remove(item)
         
+        # Восстанавливаем резервную копию
         for item in os.listdir(backup_path):
             s = os.path.join(backup_path, item)
             d = os.path.join(".", item)
@@ -247,36 +247,38 @@ class SettingsWindow(DraggableResizableWindow):
         self.update_backup_info()
 
     def delete_system_backup(self):
+        """Удаляет выбранную резервную копию."""
         backup_dir = "system_backup"
         if not os.path.exists(backup_dir):
             QMessageBox.warning(self, "Ошибка", "Резервные копии не найдены.")
             return
         
+        # Получаем список доступных резервных копий
         backups = os.listdir(backup_dir)
         if not backups:
             QMessageBox.warning(self, "Ошибка", "Резервные копии не найдены.")
             return
         
-        backup_name, ok = QInputDialog.getItem(
-            self, "Удаление резервной копии", 
-            "Выберите резервную копию для удаления:", 
-            backups, 0, False
-        )
+        # Показываем диалог выбора резервной копии для удаления
+        backup_name, ok = QInputDialog.getItem(self, "Удаление резервной копии", "Выберите резервную копию для удаления:", backups, 0, False)
         if not ok:
             return
         
         backup_path = os.path.join(backup_dir, backup_name)
+        
+        # Удаляем выбранную резервную копию
         shutil.rmtree(backup_path)
         
         QMessageBox.information(self, "Резервная копия удалена", f"Резервная копия {backup_name} успешно удалена.")
         self.update_backup_info()
 
     def update_backup_info(self):
+        """Обновляет информацию о резервных копиях."""
         backup_dir = "system_backup"
         if os.path.exists(backup_dir):
             backups = os.listdir(backup_dir)
             if backups:
-                self.backup_info_label.setText("Доступные резервные копии:")
+                self.backup_info_label.setText(f"Доступные резервные копии:")
                 self.backup_list.clear()
                 self.backup_list.addItems(backups)
                 self.restore_backup_button.setEnabled(True)

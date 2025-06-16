@@ -8,10 +8,6 @@ import subprocess
 import pywifi
 from pywifi import const
 
-from ctypes import cast, POINTER
-from comtypes import CLSCTX_ALL
-from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
-
 from PyQt6.QtCore import (
     Qt, QSize, QRect, QPoint, QUrl,
     QTimer, QTime, QDate, QProcess,

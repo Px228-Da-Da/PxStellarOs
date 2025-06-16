@@ -8,9 +8,16 @@ import subprocess
 import pywifi
 from pywifi import const
 
-from ctypes import cast, POINTER
-from comtypes import CLSCTX_ALL
-from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+
+# Условные импорты для Windows
+if platform.system() == "Windows":
+    from ctypes import cast, POINTER
+    from comtypes import CLSCTX_ALL
+    from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
+else:
+    # Альтернативные импорты для Linux
+    import pulsectl  # Для управления звуком
+
 
 from PyQt6.QtCore import (
     Qt, QSize, QRect, QPoint, QUrl,

@@ -48,6 +48,9 @@ from PyQt6.QtCore import (
     Qt, QSize, QRect, QPropertyAnimation, QEasingCurve, QTimer,
     QTime, QDate, QUrl, QPoint, QProcess, pyqtProperty
 )
+from PyQt6.QtGui import QGuiApplication
+from PyQt6.QtCore import QDateTime, QTimer
+
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin")))
 from dependencies import *
@@ -74,8 +77,17 @@ def global_exception_handler(exctype, value, tb):
 
 
 class MacOSWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.last_layout_switch_time = 0
+        self.layout_switch_delay = 500  # 500ms задержка
+        self.current_layout_label = None
+        self.layout_timer = QTimer()
+        self.layout_timer.timeout.connect(self._hide_layout_label)
+        self.layout_timer.setSingleShot(True)
+        self.keyboard_layouts = ["EN", "RU"]  # Список поддерживаемых раскладок
+        self.current_layout_index = 0  # Текущая раскладка
+        # super().__init__()
         self.is_locked = False  # Флаг для отслеживания состояния блокировки
         self.is_splash_screen_active = False  # Флаг для отслеживания состояния загрузочного экрана
         self.is_password_input_deleted = False
@@ -906,23 +918,99 @@ class MacOSWindow(QMainWindow):
         menubar.setCornerWidget(self.time_label, Qt.Corner.TopRightCorner)
     
     def keyPressEvent(self, event: QKeyEvent):
-        # Игнорируем все события клавиатуры, если экран блокировки или загрузочный экран активен
         if self.is_locked or self.is_splash_screen_active:
             return
 
-        # Обработка нажатия Ctrl + L для блокировки экрана
-        if event.key() == Qt.Key.Key_L and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+        current_time = QDateTime.currentMSecsSinceEpoch()
+        
+        # Win + L
+        if event.key() == Qt.Key.Key_L and event.modifiers() & Qt.KeyboardModifier.MetaModifier:
             self.lock_screen()
-        
-        # Обработка нажатия Ctrl + Tab для переключения между окнами
-        if event.key() == Qt.Key.Key_Tab and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+        # Alt + Shift
+        elif ((event.key() == Qt.Key.Key_Shift and event.modifiers() & Qt.KeyboardModifier.AltModifier) or
+             (event.key() == Qt.Key.Key_Alt and event.modifiers() & Qt.KeyboardModifier.ShiftModifier)):
+            if current_time - self.last_layout_switch_time > self.layout_switch_delay:
+                self._switch_keyboard_layout()
+                self.last_layout_switch_time = current_time
+        # Alt + Tab
+        elif event.key() == Qt.Key.Key_Tab and event.modifiers() & Qt.KeyboardModifier.AltModifier:
             self.switch_to_next_window()
-        
-        # Обработка нажатия Enter для разблокировки экрана
-        if event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
+        # Enter
+        elif event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
             self.unlock_screen()
         
         super().keyPressEvent(event)
+
+    def _switch_keyboard_layout(self):
+        """Переключает между предопределёнными раскладками"""
+        try:
+            # Переключаем индекс раскладки
+            self.current_layout_index = (self.current_layout_index + 1) % len(self.keyboard_layouts)
+            new_layout = self.keyboard_layouts[self.current_layout_index]
+            
+            # Для Windows можно использовать системное переключение
+            if os.name == 'nt':
+                self._switch_windows_layout(new_layout)
+            
+            # Показываем уведомление
+            self._show_layout_notification(new_layout)
+            
+        except Exception as e:
+            print(f"Ошибка переключения раскладки: {e}")
+
+    def _switch_windows_layout(self, layout):
+        """Переключение раскладки в Windows"""
+        try:
+            import ctypes
+            # Получаем список всех раскладок
+            layout_count = ctypes.windll.user32.GetKeyboardLayoutList(0, None)
+            layout_list = (ctypes.c_void_p * layout_count)()
+            ctypes.windll.user32.GetKeyboardLayoutList(layout_count, layout_list)
+            
+            # Находим нужную раскладку
+            target_layout = None
+            for layout_ptr in layout_list:
+                lang_id = layout_ptr & 0xFFFF
+                lang_name = self._get_language_name(lang_id)
+                if layout.lower() in lang_name.lower():
+                    target_layout = layout_ptr
+                    break
+            
+            if target_layout:
+                # Активируем нужную раскладку
+                ctypes.windll.user32.ActivateKeyboardLayout(target_layout, 0)
+        except Exception as e:
+            print(f"Windows layout switch error: {e}")
+
+    def _show_layout_notification(self, text):
+        """Показывает уведомление о текущей раскладке"""
+        if self.current_layout_label:
+            self.current_layout_label.deleteLater()
+        
+        self.current_layout_label = QLabel(text, self)
+        self.current_layout_label.setStyleSheet("""
+            QLabel {
+                background-color: rgba(0, 0, 0, 180);
+                color: white;
+                padding: 5px 10px;
+                border-radius: 5px;
+                font-size: 14px;
+            }
+        """)
+        self.current_layout_label.adjustSize()
+        self.current_layout_label.move(self.width() - self.current_layout_label.width() - 20, 20)
+        self.current_layout_label.show()
+        self.current_layout_label.raise_()
+        
+        self.layout_timer.start(1000)  # Скрыть через 1 секунду
+
+    def _hide_layout_label(self):
+        """Скрывает уведомление"""
+        if self.current_layout_label:
+            self.current_layout_label.deleteLater()
+            self.current_layout_label = None
+
+
 
     
     def create_window_switch_menu(self):
@@ -1231,116 +1319,6 @@ class MacOSWindow(QMainWindow):
         self.main_layout.addWidget(self.desktop)
 
 
-    # def create_dock_panel(self):
-    #     """Стилизация док-панели в стиле macOS с динамическим размером"""
-    #     self.dock_buttons = {}
-    #     self.active_windows = {}
-
-    #     # Создаем фрейм для док-панели
-    #     self.dock = QFrame()
-
-    #     # Стили с эффектом тени
-    #     self.dock.setStyleSheet("""
-    #         QFrame {
-    #             background-color: rgba(255, 255, 255, 0.25);
-    #             border-radius: 16px;
-    #             border: 1px solid rgba(255, 255, 255, 0.3);
-    #             padding: 0;
-    #         }
-    #     """)
-
-    #     # Эффект тени
-    #     shadow = QGraphicsDropShadowEffect()
-    #     shadow.setBlurRadius(20)
-    #     shadow.setColor(QColor(0, 0, 0, 150))
-    #     shadow.setOffset(0, 4)
-    #     self.dock.setGraphicsEffect(shadow)
-
-    #     # Настройка лэйаута
-    #     dock_layout = QHBoxLayout()
-    #     dock_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    #     dock_layout.setSpacing(15)
-    #     dock_layout.setContentsMargins(10, 2, 10, 2)
-
-    #     # Чтение конфигурации из файла
-    #     dock_config_path = os.path.join("root", "bin", "dock.config")
-    #     icons = []
-        
-    #     try:
-    #         with open(dock_config_path, "r", encoding="utf-8") as f:
-    #             for line in f:
-    #                 line = line.strip()
-    #                 if line and not line.startswith("#"):  # Пропускаем пустые строки и комментарии
-    #                     parts = line.split(":")
-    #                     if len(parts) >= 2:
-    #                         icon_name = parts[0].strip()
-    #                         window_name = parts[1].strip()
-    #                         icons.append((icon_name, window_name))
-    #     except FileNotFoundError:
-    #         print(f"Файл конфигурации {dock_config_path} не найден. Используются настройки по умолчанию.")
-    #         # Конфигурация по умолчанию
-    #         icons = [
-    #             ("app_store", "desktop"),
-    #             ("safari", "browser"),
-    #             ("settings", "settings"),
-    #             ("cmd", "cmd")
-    #         ]
-    #     except Exception as e:
-    #         print(f"Ошибка при чтении файла конфигурации: {e}")
-    #         icons = [
-    #             ("app_store", "desktop"),
-    #             ("safari", "browser"),
-    #             ("settings", "settings"),
-    #             ("cmd", "cmd")
-    #         ]
-
-    #     button_size = 44  # Размер кнопки
-    #     dock_padding = 20  # Отступы док-панели
-    #     dock_spacing = 15  # Промежуток между кнопками
-    #     dock_width = len(icons) * (button_size + dock_spacing) + dock_padding * 2
-    #     self.dock.setFixedSize(dock_width, 65)  # Устанавливаем ширину док-панели
-
-    #     for icon_name, window_name in icons:
-    #         icon_path = os.path.join("bin", "icons", "local_icons", "local_apps", icon_name, f"{icon_name}.png")
-
-    #         if not os.path.exists(icon_path):
-    #             print(f"Ошибка: Иконка {icon_path} не найдена!")
-    #             continue
-
-    #         btn = JumpingButton(icon_path=icon_path, parent=self)
-    #         btn.setFixedSize(button_size, button_size)
-    #         btn.setIconSize(QSize(50, 50))
-    #         btn.clicked.connect(lambda _, n=window_name: self.switch_window(n))
-
-    #         # Добавляем эффект тени для кнопки
-    #         btn_shadow = QGraphicsDropShadowEffect()
-    #         btn_shadow.setBlurRadius(10)
-    #         btn_shadow.setColor(QColor(0, 0, 0, 100))
-    #         btn_shadow.setOffset(2, 2)
-    #         btn.setGraphicsEffect(btn_shadow)
-
-    #         indicator = QLabel()
-    #         indicator.setFixedSize(20, 4)
-    #         indicator.setStyleSheet("background: transparent; border: none; border-radius: 2px;")
-
-    #         # Контейнер для кнопки и индикатора
-    #         container = QWidget()  # Создаем контейнерный виджет
-    #         container_layout = QVBoxLayout(container)
-    #         container_layout.setContentsMargins(0, 8, 0, 0)
-    #         container_layout.setSpacing(5)
-    #         container_layout.addWidget(btn, alignment=Qt.AlignmentFlag.AlignCenter)
-    #         container_layout.addWidget(indicator, alignment=Qt.AlignmentFlag.AlignHCenter)
-
-    #         # Поднимаем кнопку на верхний слой
-    #         btn.raise_()
-
-    #         # Добавляем контейнер в док-панель
-    #         dock_layout.addWidget(container)
-
-    #         self.dock_buttons[window_name] = (btn, indicator)
-
-    #     self.dock.setLayout(dock_layout)
-    #     self.main_layout.addWidget(self.dock, alignment=Qt.AlignmentFlag.AlignHCenter)
     def create_dock_panel(self):
         """Стилизация док-панели в стиле macOS с динамическим размером"""
         self.dock_buttons = {}
@@ -1404,9 +1382,6 @@ class MacOSWindow(QMainWindow):
                 ("cmd", "cmd")
             ]
 
-        # Добавляем кнопку для запуска .py файлов
-        icons.append(("python", "run_py"))
-
         button_size = 44  # Размер кнопки
         dock_padding = 20  # Отступы док-панели
         dock_spacing = 15  # Промежуток между кнопками
@@ -1423,12 +1398,7 @@ class MacOSWindow(QMainWindow):
             btn = JumpingButton(icon_path=icon_path, parent=self)
             btn.setFixedSize(button_size, button_size)
             btn.setIconSize(QSize(50, 50))
-            
-            if window_name == "run_py":
-                # Для кнопки запуска .py файла используем специальный обработчик
-                btn.clicked.connect(self.run_python_file)
-            else:
-                btn.clicked.connect(lambda _, n=window_name: self.switch_window(n))
+            btn.clicked.connect(lambda _, n=window_name: self.switch_window(n))
 
             # Добавляем эффект тени для кнопки
             btn_shadow = QGraphicsDropShadowEffect()
@@ -1460,30 +1430,6 @@ class MacOSWindow(QMainWindow):
         self.dock.setLayout(dock_layout)
         self.main_layout.addWidget(self.dock, alignment=Qt.AlignmentFlag.AlignHCenter)
 
-    def run_python_file(self):
-        """Запускает browser_window.py напрямую"""
-        # Полный путь к файлу browser_window.py
-        browser_path = os.path.join("apps", "local", "browser_window.py")
-        
-        try:
-            # Проверяем существует ли файл
-            if os.path.exists(browser_path):
-                # Запускаем файл в отдельном процессе
-                import subprocess
-                subprocess.Popen(["python", browser_path])
-            else:
-                # Если файл не найден, показываем ошибку
-                QMessageBox.critical(
-                    self, 
-                    "Ошибка", 
-                    f"Файл браузера не найден по пути:\n{browser_path}"
-                )
-        except Exception as e:
-            QMessageBox.critical(
-                self, 
-                "Ошибка", 
-                f"Не удалось запустить браузер:\n{str(e)}"
-            )
 
 
 

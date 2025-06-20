@@ -3,8 +3,7 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage, QWebEngineSettings
 from PyQt6.QtCore import QUrl, QStandardPaths
 from PyQt6.QtGui import QIcon
-# from apps.local.init import DraggableResizableWindow  # Импортируем базовый класс окна
-from init import DraggableResizableWindow  # Импортируем базовый класс окна
+from apps.local.init import DraggableResizableWindow  # Импортируем базовый класс окна
 
 class BrowserWindow(DraggableResizableWindow):
     def __init__(self, parent=None, window_name=""):
@@ -146,14 +145,3 @@ class BrowserWindow(DraggableResizableWindow):
             print(f"Создаём новое окно {window_name}")
             self.open_windows[window_name] = getattr(self, f"create_{window_name}_window")()
             self.open_windows[window_name].show()
-
-
-# Добавляем в конец browser_window.py:
-if __name__ == "__main__":
-    from PyQt6.QtWidgets import QApplication
-    import sys
-    
-    app = QApplication(sys.argv)
-    browser = BrowserWindow()
-    browser.show()
-    sys.exit(app.exec())

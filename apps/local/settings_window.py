@@ -128,60 +128,92 @@ class SettingsWindow(DraggableResizableWindow):
             self.update_button.setEnabled(False)
 
     def backup_current_version(self):
+        """Создает резервную копию текущей версии системы"""
         backup_dir = "backup"
-        if not os.path.exists(backup_dir):
-            os.makedirs(backup_dir)
-        
-        for item in os.listdir("."):
-            if item != backup_dir:
-                s = os.path.join(".", item)
-                d = os.path.join(backup_dir, item)
-                if os.path.isdir(s):
-                    shutil.copytree(s, d, symlinks=True, ignore=None)
-                else:
-                    shutil.copy2(s, d)
+        try:
+            # Создаем папку для резервной копии (если не существует)
+            if not os.path.exists(backup_dir):
+                os.makedirs(backup_dir)
+            
+            # Копируем все файлы и папки, кроме самой папки backup
+            for item in os.listdir("."):
+                if item != backup_dir and not item.startswith('.'):  # Исключаем скрытые файлы/папки
+                    src_path = os.path.join(".", item)
+                    dst_path = os.path.join(backup_dir, item)
+                    
+                    if os.path.isdir(src_path):
+                        # Для директорий используем copytree с dirs_exist_ok=True
+                        shutil.copytree(src_path, dst_path, symlinks=True, 
+                                      ignore=None, dirs_exist_ok=True)
+                    else:
+                        # Для файлов просто копируем
+                        shutil.copy2(src_path, dst_path)
+            return True
+        except Exception as e:
+            print(f"Backup error: {e}")
+            QMessageBox.critical(self, "Ошибка резервного копирования", 
+                               f"Не удалось создать резервную копию:\n{str(e)}")
+            return False
 
     def rollback_update(self):
+        """Откатывает систему до предыдущей версии из резервной копии"""
         backup_dir = "backup"
         if not os.path.exists(backup_dir):
             QMessageBox.warning(self, "Ошибка", "Резервная копия не найдена. Откат невозможен.")
             return False
         
-        for item in os.listdir("."):
-            if item != backup_dir:
-                if os.path.isdir(item):
-                    shutil.rmtree(item)
+        try:
+            # Удаляем текущие файлы (кроме папки backup)
+            for item in os.listdir("."):
+                if item != backup_dir and not item.startswith('.'):  # Исключаем скрытые файлы/папки
+                    item_path = os.path.join(".", item)
+                    if os.path.isdir(item_path):
+                        shutil.rmtree(item_path)
+                    else:
+                        os.remove(item_path)
+            
+            # Восстанавливаем из резервной копии
+            for item in os.listdir(backup_dir):
+                src_path = os.path.join(backup_dir, item)
+                dst_path = os.path.join(".", item)
+                
+                if os.path.isdir(src_path):
+                    shutil.copytree(src_path, dst_path, symlinks=True, 
+                                  ignore=None, dirs_exist_ok=True)
                 else:
-                    os.remove(item)
-        
-        for item in os.listdir(backup_dir):
-            s = os.path.join(backup_dir, item)
-            d = os.path.join(".", item)
-            if os.path.isdir(s):
-                shutil.copytree(s, d, symlinks=True, ignore=None)
-            else:
-                shutil.copy2(s, d)
-        
-        QMessageBox.information(self, "Откат завершен", "Приложение восстановлено до предыдущей версии.")
-        self.rollback_button.setEnabled(False)
-        return True
+                    shutil.copy2(src_path, dst_path)
+            
+            QMessageBox.information(self, "Откат завершен", "Приложение восстановлено до предыдущей версии.")
+            self.rollback_button.setEnabled(False)
+            return True
+        except Exception as e:
+            print(f"Rollback error: {e}")
+            QMessageBox.critical(self, "Ошибка отката", 
+                               f"Не удалось выполнить откат:\n{str(e)}")
+            return False
 
     def run_update(self):
+        """Выполняет обновление системы"""
         selected_branch = UPDATE_BRANCHES[self.branch_combo.currentText()]
-        self.backup_current_version()
         
+        # Сначала создаем резервную копию
+        if not self.backup_current_version():
+            self.current_version_label.setText("Ошибка при создании резервной копии. Обновление отменено.")
+            return
+        
+        # Пытаемся выполнить обновление
         if update_application(selected_branch):
             self.current_version_label.setText(
-                f"Обновление завершено (ветка {self.branch_combo.currentText()}). Перезапустите ос."
+                f"Обновление завершено (ветка {self.branch_combo.currentText()}). Перезапустите приложение."
             )
             self.rollback_button.setEnabled(True)
-            self.reboot_system()
+            # self.reboot_system()  # Раскомментируйте, если нужно автоматически перезагружать
         else:
             self.current_version_label.setText("Ошибка при обновлении. Попытка отката...")
             if self.rollback_update():
                 self.current_version_label.setText("Откат выполнен успешно.")
             else:
-                self.current_version_label.setText("Откат не удался.")
+                self.current_version_label.setText("Откат не удался. Система может быть в нестабильном состоянии.")
 
     def reboot_system(self):
         """

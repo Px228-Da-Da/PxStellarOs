@@ -10,6 +10,7 @@ from DeathScreen import DeathScreen
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "sys", "class_", "win", "system_class", "styles")))
 from ToggleSwitch import ToggleSwitch
 from Input import Input
+from Button import Button
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "sys", "class_", "win", "Widgets")))
 from CalendarWidget import CalendarWidget

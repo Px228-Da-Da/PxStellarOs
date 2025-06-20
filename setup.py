@@ -1231,6 +1231,116 @@ class MacOSWindow(QMainWindow):
         self.main_layout.addWidget(self.desktop)
 
 
+    # def create_dock_panel(self):
+    #     """Стилизация док-панели в стиле macOS с динамическим размером"""
+    #     self.dock_buttons = {}
+    #     self.active_windows = {}
+
+    #     # Создаем фрейм для док-панели
+    #     self.dock = QFrame()
+
+    #     # Стили с эффектом тени
+    #     self.dock.setStyleSheet("""
+    #         QFrame {
+    #             background-color: rgba(255, 255, 255, 0.25);
+    #             border-radius: 16px;
+    #             border: 1px solid rgba(255, 255, 255, 0.3);
+    #             padding: 0;
+    #         }
+    #     """)
+
+    #     # Эффект тени
+    #     shadow = QGraphicsDropShadowEffect()
+    #     shadow.setBlurRadius(20)
+    #     shadow.setColor(QColor(0, 0, 0, 150))
+    #     shadow.setOffset(0, 4)
+    #     self.dock.setGraphicsEffect(shadow)
+
+    #     # Настройка лэйаута
+    #     dock_layout = QHBoxLayout()
+    #     dock_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    #     dock_layout.setSpacing(15)
+    #     dock_layout.setContentsMargins(10, 2, 10, 2)
+
+    #     # Чтение конфигурации из файла
+    #     dock_config_path = os.path.join("root", "bin", "dock.config")
+    #     icons = []
+        
+    #     try:
+    #         with open(dock_config_path, "r", encoding="utf-8") as f:
+    #             for line in f:
+    #                 line = line.strip()
+    #                 if line and not line.startswith("#"):  # Пропускаем пустые строки и комментарии
+    #                     parts = line.split(":")
+    #                     if len(parts) >= 2:
+    #                         icon_name = parts[0].strip()
+    #                         window_name = parts[1].strip()
+    #                         icons.append((icon_name, window_name))
+    #     except FileNotFoundError:
+    #         print(f"Файл конфигурации {dock_config_path} не найден. Используются настройки по умолчанию.")
+    #         # Конфигурация по умолчанию
+    #         icons = [
+    #             ("app_store", "desktop"),
+    #             ("safari", "browser"),
+    #             ("settings", "settings"),
+    #             ("cmd", "cmd")
+    #         ]
+    #     except Exception as e:
+    #         print(f"Ошибка при чтении файла конфигурации: {e}")
+    #         icons = [
+    #             ("app_store", "desktop"),
+    #             ("safari", "browser"),
+    #             ("settings", "settings"),
+    #             ("cmd", "cmd")
+    #         ]
+
+    #     button_size = 44  # Размер кнопки
+    #     dock_padding = 20  # Отступы док-панели
+    #     dock_spacing = 15  # Промежуток между кнопками
+    #     dock_width = len(icons) * (button_size + dock_spacing) + dock_padding * 2
+    #     self.dock.setFixedSize(dock_width, 65)  # Устанавливаем ширину док-панели
+
+    #     for icon_name, window_name in icons:
+    #         icon_path = os.path.join("bin", "icons", "local_icons", "local_apps", icon_name, f"{icon_name}.png")
+
+    #         if not os.path.exists(icon_path):
+    #             print(f"Ошибка: Иконка {icon_path} не найдена!")
+    #             continue
+
+    #         btn = JumpingButton(icon_path=icon_path, parent=self)
+    #         btn.setFixedSize(button_size, button_size)
+    #         btn.setIconSize(QSize(50, 50))
+    #         btn.clicked.connect(lambda _, n=window_name: self.switch_window(n))
+
+    #         # Добавляем эффект тени для кнопки
+    #         btn_shadow = QGraphicsDropShadowEffect()
+    #         btn_shadow.setBlurRadius(10)
+    #         btn_shadow.setColor(QColor(0, 0, 0, 100))
+    #         btn_shadow.setOffset(2, 2)
+    #         btn.setGraphicsEffect(btn_shadow)
+
+    #         indicator = QLabel()
+    #         indicator.setFixedSize(20, 4)
+    #         indicator.setStyleSheet("background: transparent; border: none; border-radius: 2px;")
+
+    #         # Контейнер для кнопки и индикатора
+    #         container = QWidget()  # Создаем контейнерный виджет
+    #         container_layout = QVBoxLayout(container)
+    #         container_layout.setContentsMargins(0, 8, 0, 0)
+    #         container_layout.setSpacing(5)
+    #         container_layout.addWidget(btn, alignment=Qt.AlignmentFlag.AlignCenter)
+    #         container_layout.addWidget(indicator, alignment=Qt.AlignmentFlag.AlignHCenter)
+
+    #         # Поднимаем кнопку на верхний слой
+    #         btn.raise_()
+
+    #         # Добавляем контейнер в док-панель
+    #         dock_layout.addWidget(container)
+
+    #         self.dock_buttons[window_name] = (btn, indicator)
+
+    #     self.dock.setLayout(dock_layout)
+    #     self.main_layout.addWidget(self.dock, alignment=Qt.AlignmentFlag.AlignHCenter)
     def create_dock_panel(self):
         """Стилизация док-панели в стиле macOS с динамическим размером"""
         self.dock_buttons = {}
@@ -1294,6 +1404,9 @@ class MacOSWindow(QMainWindow):
                 ("cmd", "cmd")
             ]
 
+        # Добавляем кнопку для запуска .py файлов
+        icons.append(("python", "run_py"))
+
         button_size = 44  # Размер кнопки
         dock_padding = 20  # Отступы док-панели
         dock_spacing = 15  # Промежуток между кнопками
@@ -1310,7 +1423,12 @@ class MacOSWindow(QMainWindow):
             btn = JumpingButton(icon_path=icon_path, parent=self)
             btn.setFixedSize(button_size, button_size)
             btn.setIconSize(QSize(50, 50))
-            btn.clicked.connect(lambda _, n=window_name: self.switch_window(n))
+            
+            if window_name == "run_py":
+                # Для кнопки запуска .py файла используем специальный обработчик
+                btn.clicked.connect(self.run_python_file)
+            else:
+                btn.clicked.connect(lambda _, n=window_name: self.switch_window(n))
 
             # Добавляем эффект тени для кнопки
             btn_shadow = QGraphicsDropShadowEffect()
@@ -1342,6 +1460,30 @@ class MacOSWindow(QMainWindow):
         self.dock.setLayout(dock_layout)
         self.main_layout.addWidget(self.dock, alignment=Qt.AlignmentFlag.AlignHCenter)
 
+    def run_python_file(self):
+        """Запускает browser_window.py напрямую"""
+        # Полный путь к файлу browser_window.py
+        browser_path = os.path.join("apps", "local", "browser_window.py")
+        
+        try:
+            # Проверяем существует ли файл
+            if os.path.exists(browser_path):
+                # Запускаем файл в отдельном процессе
+                import subprocess
+                subprocess.Popen(["python", browser_path])
+            else:
+                # Если файл не найден, показываем ошибку
+                QMessageBox.critical(
+                    self, 
+                    "Ошибка", 
+                    f"Файл браузера не найден по пути:\n{browser_path}"
+                )
+        except Exception as e:
+            QMessageBox.critical(
+                self, 
+                "Ошибка", 
+                f"Не удалось запустить браузер:\n{str(e)}"
+            )
 
 
 

@@ -1,26 +1,8 @@
-from PyQt6.QtCore import QTimer, QTime, QDate
-from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QVBoxLayout, QPushButton, QWidget, QHBoxLayout, QFrame, QLabel, QMessageBox, QStackedWidget, QMenuBar, QToolBar, QLineEdit,QTabWidget, QMenu
-)
-from PyQt6.QtGui import QKeyEvent
-from PyQt6.QtCore import Qt, QSize, QUrl, QPoint
-from PyQt6.QtGui import QIcon, QPixmap, QMouseEvent, QColor, QPainter, QBrush, QFont
-from PyQt6.QtWebEngineWidgets import QWebEngineView
 import sys
-from PyQt6.QtGui import QAction
+import os
 
-from PyQt6.QtCore import QTimer, QTime, QDate
-from PyQt6.QtGui import QAction, QFont
-from PyQt6.QtWidgets import QLabel, QMenuBar
-
-import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout, QTextEdit, QLineEdit, QPushButton, QHBoxLayout
-from PyQt6.QtCore import QProcess
-
-
-import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget, QWidget, QVBoxLayout, QTextEdit, QLineEdit, QPushButton, QHBoxLayout
-from PyQt6.QtCore import QProcess
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin")))
+from dependencies import *
 
 class TerminalTab(QWidget):
     def __init__(self):
@@ -62,7 +44,15 @@ class TerminalTab(QWidget):
         self.process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)  # Объединение stdout и stderr
         self.process.readyReadStandardOutput.connect(self.read_output)
         self.process.readyReadStandardError.connect(self.read_output)
-        self.process.start("cmd", ["/K"])  # Оставляем процесс открытым
+        if platform.system() == "Windows":
+            self.process.start("cmd", ["/K"])
+        else:
+            # Linux / MacOS (sh — найсумісніший, або bash якщо є)
+            if os.path.exists("/bin/bash"):
+                self.process.start("/bin/bash")
+            else:
+                self.process.start("/bin/sh")
+  # Оставляем процесс открытым
 
     def execute_command(self):
         command = self.input.text()
@@ -72,7 +62,11 @@ class TerminalTab(QWidget):
             self.input.clear()
 
     def read_output(self):
-        output = self.process.readAllStandardOutput().data().decode("cp866", errors="ignore").strip()
+        if platform.system() == "Windows":
+            output = self.process.readAllStandardOutput().data().decode("cp866", errors="ignore").strip()
+        else:
+            output = self.process.readAllStandardOutput().data().decode("utf-8", errors="ignore").strip()
+
         if output:
             self.output.append(output)  # Показываем результат выполнения
 

@@ -1,0 +1,12 @@
+{
+  "Shutdown": "Shutdown",
+  "Reboot": "Reboot",
+  "Lock": "Lock",
+  "Password": "Password",
+  "Power": "power",
+  "Enter URL or search": "Enter URL or search",
+  "New Tab": "New Tab",
+  "Incorrect password!": "Incorrect password!",
+  "Error": "Error",
+  "Error_wifi": "Wi-Fi adapter not found"
+}

@@ -1,6 +1,8 @@
-from PyQt6.QtWidgets import QLineEdit
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+import sys
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin")))
+from dependencies import *
 
 class Input(QLineEdit):
     def __init__(

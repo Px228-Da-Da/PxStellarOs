@@ -1,33 +1,8 @@
-import os
 import sys
-import json
-import time
-import platform
-import subprocess
+import os
 
-import pywifi
-from pywifi import const
-
-from PyQt6.QtCore import (
-    Qt, QSize, QRect, QPoint, QUrl,
-    QTimer, QTime, QDate, QProcess,
-    QPropertyAnimation, QEasingCurve, pyqtProperty
-)
-from PyQt6.QtGui import (
-    QIcon, QColor, QPixmap, QCursor,
-    QMouseEvent, QEnterEvent, QKeyEvent,
-    QPainter, QBrush, QFont, QAction
-)
-from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget,
-    QLabel, QPushButton, QVBoxLayout, QHBoxLayout,
-    QFrame, QStackedWidget, QMenuBar, QToolBar,
-    QLineEdit, QTabWidget, QMenu, QSlider,
-    QInputDialog, QListWidget, QListWidgetItem,
-    QCalendarWidget, QTextEdit, QProgressBar,
-    QGraphicsDropShadowEffect, QGridLayout
-)
-from PyQt6.QtWebEngineWidgets import QWebEngineView
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin")))
+from dependencies import *
 
 
 

@@ -6,8 +6,9 @@ from PyQt6.QtGui import QIcon
 from apps.local.init import DraggableResizableWindow  # Импортируем базовый класс окна
 
 class BrowserWindow(DraggableResizableWindow):
-    def __init__(self, parent=None, window_name=""):
+    def __init__(self, parent=None, window_name="", translator=None):
         super().__init__(parent)
+        self.tr = translator if translator else lambda x: x
         self.parent_window = parent
         self.window_name = window_name  # Сохраняем имя окна
 
@@ -25,7 +26,10 @@ class BrowserWindow(DraggableResizableWindow):
         # Добавляем элементы управления в заголовок окна
         self.add_search_and_buttons_to_title_bar()
 
-        self.add_tab("https://www.google.com")
+        # self.add_tab("https://www.google.com")
+        lang_code = self.parent_window.current_language  # "uk", "en", ...
+        self.add_tab(f"https://www.google.com/?hl={lang_code}")
+
         self.hide()
 
     def add_search_and_buttons_to_title_bar(self):
@@ -52,7 +56,7 @@ class BrowserWindow(DraggableResizableWindow):
 
         # Создаем поле ввода для URL
         self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Enter URL or search")
+        self.search_input.setPlaceholderText(self.tr("Enter URL or search"))
         self.search_input.setStyleSheet("background-color: white; color: black; padding: 5px; border-radius: 10px;")
         self.search_input.returnPressed.connect(self.load_url)
 
@@ -78,7 +82,7 @@ class BrowserWindow(DraggableResizableWindow):
         browser.page().fullScreenRequested.connect(self.handle_fullscreen_request)
         
         browser.setUrl(QUrl(url))
-        self.tab_widget.addTab(browser, f"Tab {self.tab_widget.count() + 1}")
+        self.tab_widget.addTab(browser, self.tr("New Tab"))
         self.tab_widget.setCurrentWidget(browser)
 
         # Обновление строки поиска при изменении URL текущей вкладки
@@ -138,10 +142,10 @@ class BrowserWindow(DraggableResizableWindow):
                     window.close_window()
                     self.open_windows[window_name] = None
             except RuntimeError:
-                print(f"Окно {window_name} было удалено. Создаём заново...")
+                # print(f"Окно {window_name} было удалено. Создаём заново...")
                 self.open_windows[window_name] = getattr(self, f"create_{window_name}_window")()
                 self.open_windows[window_name].show()
         else:
-            print(f"Создаём новое окно {window_name}")
+            # print(f"Создаём новое окно {window_name}")
             self.open_windows[window_name] = getattr(self, f"create_{window_name}_window")()
             self.open_windows[window_name].show()

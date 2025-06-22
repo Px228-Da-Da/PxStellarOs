@@ -1,56 +1,5 @@
-import subprocess
 import sys
-import json
-import pywifi
-from pywifi import const
-import time
 import os
-import platform
-import traceback
-
-# Установка пакетов
-def install_package(package_name):
-    try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
-    except subprocess.CalledProcessError:
-        print(f"Не вдалося встановити {package_name}")
-
-# Проверка и установка PyQt6 и PyQt6-WebEngine
-try:
-    import PyQt6
-except ImportError:
-    install_package("PyQt6")
-
-try:
-    import PyQt6.QtWebEngineWidgets
-except ImportError:
-    install_package("PyQt6-WebEngine")
-
-# Добавьте новый импорт для PulseAudio
-# try:
-#     import pulsectl
-# except ImportError:
-#     subprocess.check_call([sys.executable, "-m", "pip", "install", "pulsectl"])
-#     import pulsectl
-
-# PyQt6 импорты
-from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QFrame, QPushButton,
-    QLabel, QMessageBox, QStackedWidget, QMenuBar, QToolBar, QLineEdit, QTabWidget, QMenu,
-    QTextEdit, QCalendarWidget, QListWidget, QListWidgetItem, QProgressBar, QGridLayout, QGraphicsDropShadowEffect, QSlider
-)
-from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtGui import (
-    QIcon, QColor, QEnterEvent, QMouseEvent, QKeyEvent, QCursor, QPixmap,
-    QPainter, QBrush, QFont, QAction
-)
-from PyQt6.QtCore import (
-    Qt, QSize, QRect, QPropertyAnimation, QEasingCurve, QTimer,
-    QTime, QDate, QUrl, QPoint, QProcess, pyqtProperty
-)
-from PyQt6.QtGui import QGuiApplication
-from PyQt6.QtCore import QDateTime, QTimer
-
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin")))
 from dependencies import *
@@ -76,9 +25,21 @@ def global_exception_handler(exctype, value, tb):
         sys.exit(temp_app.exec())
 
 
+# # Активна кнопка
+# active_btn = CustomButton("Активна кнопка", style='contained', enabled=True)
+# layout.addWidget(active_btn)
+
+# # Неактивна кнопка
+# disabled_btn = CustomButton("Неактивна кнопка", style='contained', enabled=False)
+# layout.addWidget(disabled_btn)
+
+
 class MacOSWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.current_language = "uk"  # або "en", або зчитуй із конфіг-файлу
+        self.load_translations(self.current_language)
+
         self.last_layout_switch_time = 0
         self.layout_switch_delay = 500  # 500ms задержка
         self.current_layout_label = None
@@ -99,9 +60,9 @@ class MacOSWindow(QMainWindow):
             if self.wifi.interfaces():
                 self.iface = self.wifi.interfaces()[0]
             else:
-                QMessageBox.warning(self, "Ошибка", "Wi-Fi адаптер не найден")
+                QMessageBox.warning(self, self.tr("Error"), self.tr("Error_wifi"))
         except Exception as e:
-            QMessageBox.warning(self, "Ошибка", f"Ошибка инициализации Wi-Fi: {str(e)}")
+            QMessageBox.warning(self, self.tr("Error"), f"Error initialization Wi-Fi: {str(e)}")
         try:
             self.desk_config = "root/user/desk/desk.config"
             self.active_windows = {}
@@ -155,7 +116,7 @@ class MacOSWindow(QMainWindow):
             self.create_menu()
             self.open_windows = {}
             self.create_all_windows()
-            self.check_for_updates()
+            # self.check_for_updates()
 
             
             # Создаем экран блокировки
@@ -165,6 +126,25 @@ class MacOSWindow(QMainWindow):
         except Exception as e:
             # Если ошибка происходит в конструкторе, показываем её в DeathScreen
             self.show_death_screen(f"Critical error in constructor: {str(e)}")
+
+    def load_translations(self, language_code):
+        """Завантажує файл перекладу за кодом мови."""
+        import json
+        translation_path = os.path.join("translations", f"{language_code}.json")
+        try:
+            with open(translation_path, "r", encoding="utf-8") as f:
+                self.translations = json.load(f)
+        except FileNotFoundError:
+            print(f"Translation file {translation_path} not found.")
+            self.translations = {}
+        except Exception as e:
+            print(f"Error loading translation: {e}")
+            self.translations = {}
+
+    def tr(self, key):
+        """Повертає перекладений текст або ключ, якщо не знайдено."""
+        return self.translations.get(key, key)
+
 
     def create_volume_button(self):
         """Создает кнопку громкости в правом нижнем углу"""
@@ -520,7 +500,7 @@ class MacOSWindow(QMainWindow):
         # Поле ввода пароля
         self.password_input = Input(
             parent=self.lock_widget,
-            placeholder_text="Password",
+            placeholder_text=self.tr("Password"),
             initial_text="",  # Можно указать заранее введённый текст, если нужно
             echo_mode=QLineEdit.EchoMode.Password  # Или QLineEdit.EchoMode.Normal для обычного текста
         )
@@ -572,7 +552,7 @@ class MacOSWindow(QMainWindow):
         additional_layout.setContentsMargins(10, 10, 10, 10)
 
         # Первая дополнительная кнопка
-        self.button1 = QPushButton("Shutdown", self)  # Текст кнопки
+        self.button1 = QPushButton(self.tr("Shutdown"), self)  # Текст кнопки
         self.button1.setIcon(QIcon(os.path.join("bin", "icons", "local_icons", "IconOs", "shutdown.png")))  # Иконка кнопки
         self.button1.setIconSize(QSize(30, 30))  # Размер иконки
         self.button1.setFixedSize(120, 40)  # Размер кнопки (ширина, высота)
@@ -596,7 +576,7 @@ class MacOSWindow(QMainWindow):
         additional_layout.addWidget(self.button1)  # Добавляем кнопку в лэйаут
 
         # Вторая дополнительная кнопка
-        self.button2 = QPushButton("Reboot", self)  # Текст кнопки
+        self.button2 = QPushButton(self.tr("Reboot"), self)  # Текст кнопки
         self.button2.setIcon(QIcon(os.path.join("bin", "icons", "local_icons", "IconOs", "reboot.png")))  # Иконка кнопки
         self.button2.setIconSize(QSize(30, 30))  # Размер иконки
         self.button2.setFixedSize(120, 40)  # Размер кнопки (ширина, высота)
@@ -691,7 +671,7 @@ class MacOSWindow(QMainWindow):
                 self.animation.start()
             else:
                 # Показываем сообщение об ошибке
-                QMessageBox.warning(self, "Error", "Incorrect password!")
+                QMessageBox.warning(self, self.tr("Error"), self.tr("Incorrect password!"))
         except RuntimeError:
             # Если объект уже удален, просто выходим из метода
             return
@@ -705,23 +685,23 @@ class MacOSWindow(QMainWindow):
         self.splash_widget.setStyleSheet("background-color: black;")
 
         # Логотип
-        icon_dir_path = os.path.join("bin", "icons", "local_icons", "IconOs", "OS.png")
-        logo_pixmap = QPixmap(icon_dir_path)
+        # icon_dir_path = os.path.join("bin", "icons", "local_icons", "IconOs", "OS.png")
+        # logo_pixmap = QPixmap(icon_dir_path)
 
-        # Уменьшаем размер изображения логотипа (например, в 2 раза)
-        new_width = logo_pixmap.width() // 2
-        new_height = logo_pixmap.height() // 2
-        scaled_pixmap = logo_pixmap.scaled(new_width, new_height, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        # # Уменьшаем размер изображения логотипа (например, в 2 раза)
+        # new_width = logo_pixmap.width() // 2
+        # new_height = logo_pixmap.height() // 2
+        # scaled_pixmap = logo_pixmap.scaled(new_width, new_height, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
 
-        logo_label = QLabel(self.splash_widget)
-        logo_label.setPixmap(scaled_pixmap)
-        logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        logo_label.setGeometry(
-            (self.width() - scaled_pixmap.width()) // 2,
-            (self.height() - scaled_pixmap.height()) // 2 - 50,  # Сдвигаем логотип выше, чтобы освободить место для прогресс-бара
-            scaled_pixmap.width(),
-            scaled_pixmap.height()
-        )
+        # logo_label = QLabel(self.splash_widget)
+        # logo_label.setPixmap(scaled_pixmap)
+        # logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # logo_label.setGeometry(
+        #     (self.width() - scaled_pixmap.width()) // 2,
+        #     (self.height() - scaled_pixmap.height()) // 2 - 50,  # Сдвигаем логотип выше, чтобы освободить место для прогресс-бара
+        #     scaled_pixmap.width(),
+        #     scaled_pixmap.height()
+        # )
 
         # Таймер для задержки перед анимацией
         self.timer = QTimer()
@@ -776,11 +756,12 @@ class MacOSWindow(QMainWindow):
         progress_dialog.close()  # Закрываем прогресс-бар
 
         if update_application():
-            print("Обновление завершено. Перезапустите приложение.")
+            # print("Обновление завершено. Перезапустите приложение.")
             # sys.exit(0)
             self.reboot_system()
         else:
-            print("Ошибка при обновлении.")
+            # print("Ошибка при обновлении.")
+            self.reboot_system()
 
 
     def start_update_process(self):
@@ -798,10 +779,12 @@ class MacOSWindow(QMainWindow):
 
         # Запускаем процесс обновления
         if update_application():
-            print("Обновление завершено. Перезапустите приложение.")
-            sys.exit(0)
+            # print("Обновление завершено. Перезапустите приложение.")
+            # sys.exit(0)
+            self.reboot_system()
         else:
-            print("Ошибка при обновлении.")
+            # print("Ошибка при обновлении.")
+            self.reboot_system()
     
 
     def load_background_image(self):
@@ -819,7 +802,8 @@ class MacOSWindow(QMainWindow):
                 self.background.setPixmap(pixmap)
                 self.background.setGeometry(0, 0, self.width(), self.height())
         except Exception as e:
-            print(f"Ошибка загрузки фона: {e}")
+            # print(f"Ошибка загрузки фона: {e}")
+            pass
 
 
     def switch_to_next_window(self):
@@ -852,7 +836,7 @@ class MacOSWindow(QMainWindow):
             "cmd": None,
             "settings": None,
         }
-        self.open_windows["browser"] = BrowserWindow(self, "browser")
+        self.open_windows["browser"] = BrowserWindow(self, "browser", translator=self.tr)
 
     def create_menu(self):
         """
@@ -885,20 +869,20 @@ class MacOSWindow(QMainWindow):
         self.update_win_menu("desktop")
 
         # Меню "Power" (Выключение и перезагрузка)
-        power_menu = menubar.addMenu("Power")
+        power_menu = menubar.addMenu(self.tr("Power"))
 
         # Действие для выключения
-        shutdown_action = QAction("Shutdown", self)
+        shutdown_action = QAction(self.tr("Shutdown"), self)
         shutdown_action.triggered.connect(self.shutdown_system)
         power_menu.addAction(shutdown_action)
 
         # Действие для перезагрузки
-        reboot_action = QAction("Reboot", self)
+        reboot_action = QAction(self.tr("Reboot"), self)
         reboot_action.triggered.connect(self.reboot_system)
         power_menu.addAction(reboot_action)
 
         # Действие для блокировки экрана
-        lock_action = QAction("Lock", self)  # Кнопка блокировки
+        lock_action = QAction(self.tr("Lock"), self)  # Кнопка блокировки
         lock_action.triggered.connect(self.lock_screen)  # Связываем с методом блокировки
         power_menu.addAction(lock_action)  # Добавляем в меню "Power"
 
@@ -956,7 +940,8 @@ class MacOSWindow(QMainWindow):
             self._show_layout_notification(new_layout)
             
         except Exception as e:
-            print(f"Ошибка переключения раскладки: {e}")
+            # print(f"Ошибка переключения раскладки: {e}")
+            pass
 
     def _switch_windows_layout(self, layout):
         """Переключение раскладки в Windows"""
@@ -1365,7 +1350,7 @@ class MacOSWindow(QMainWindow):
                             window_name = parts[1].strip()
                             icons.append((icon_name, window_name))
         except FileNotFoundError:
-            print(f"Файл конфигурации {dock_config_path} не найден. Используются настройки по умолчанию.")
+            # print(f"Файл конфигурации {dock_config_path} не найден. Используются настройки по умолчанию.")
             # Конфигурация по умолчанию
             icons = [
                 ("app_store", "desktop"),
@@ -1374,7 +1359,7 @@ class MacOSWindow(QMainWindow):
                 ("cmd", "cmd")
             ]
         except Exception as e:
-            print(f"Ошибка при чтении файла конфигурации: {e}")
+            # print(f"Ошибка при чтении файла конфигурации: {e}")
             icons = [
                 ("app_store", "desktop"),
                 ("safari", "browser"),
@@ -1392,7 +1377,7 @@ class MacOSWindow(QMainWindow):
             icon_path = os.path.join("bin", "icons", "local_icons", "local_apps", icon_name, f"{icon_name}.png")
 
             if not os.path.exists(icon_path):
-                print(f"Ошибка: Иконка {icon_path} не найдена!")
+                # print(f"Ошибка: Иконка {icon_path} не найдена!")
                 continue
 
             btn = JumpingButton(icon_path=icon_path, parent=self)
@@ -1446,49 +1431,49 @@ class MacOSWindow(QMainWindow):
             else:
                 window.showMinimized()  # Сворачиваем окно
         else:
-            print(f"Окно {window_name} не открыто. Открываем...")
+            # print(f"Окно {window_name} не открыто. Открываем...")
             self.open_windows[window_name] = getattr(self, f"create_{window_name}_window")()
             self.open_windows[window_name].show()
             
 
 
-    def show_context_menu(self, window_name, button):
-        """
-        Показывает контекстное меню при нажатии правой кнопкой мыши на иконку в док-панели.
-        """
-        menu = QMenu()
+    # def show_context_menu(self, window_name, button):
+    #     """
+    #     Показывает контекстное меню при нажатии правой кнопкой мыши на иконку в док-панели.
+    #     """
+    #     menu = QMenu()
 
-        # Опции меню
-        action_pin = QAction("Закрепить на панели задач", self)
-        action_close = QAction("Закрыть окно", self)
-        action_kill = QAction("Завершить задачу", self)
+    #     # Опции меню
+    #     action_pin = QAction("Закрепить на панели задач", self)
+    #     action_close = QAction("Закрыть окно", self)
+    #     action_kill = QAction("Завершить задачу", self)
 
-        # Привязка действий к кнопкам
-        action_close.triggered.connect(lambda: self.close_window(window_name))
-        action_kill.triggered.connect(lambda: self.force_close_window(window_name))
+    #     # Привязка действий к кнопкам
+    #     action_close.triggered.connect(lambda: self.close_window(window_name))
+    #     action_kill.triggered.connect(lambda: self.force_close_window(window_name))
 
-        # Добавление опций в меню
-        menu.addAction(action_pin)
-        menu.addAction(action_kill)
-        menu.addAction(action_close)
+    #     # Добавление опций в меню
+    #     menu.addAction(action_pin)
+    #     menu.addAction(action_kill)
+    #     menu.addAction(action_close)
 
-        # Отображение меню под кнопкой
-        menu.exec(button.mapToGlobal(QPoint(0, button.height())))
+    #     # Отображение меню под кнопкой
+    #     menu.exec(button.mapToGlobal(QPoint(0, button.height())))
 
-    def close_window(self, window_name):
-        """ Закрывает окно, если оно открыто. """
-        window = self.open_windows.get(window_name)
-        if window:
-            window.close()
-            self.open_windows[window_name] = None
-            print(f"Окно {window_name} закрыто.")
+    # def close_window(self, window_name):
+    #     """ Закрывает окно, если оно открыто. """
+    #     window = self.open_windows.get(window_name)
+    #     if window:
+    #         window.close()
+    #         self.open_windows[window_name] = None
+    #         print(f"Окно {window_name} закрыто.")
 
-    def force_close_window(self, window_name):
-        """ Принудительно завершает процесс приложения. """
-        if window_name in self.processes:
-            self.processes[window_name].terminate()
-            del self.processes[window_name]
-            print(f"Процесс {window_name} завершён принудительно.")
+    # def force_close_window(self, window_name):
+    #     """ Принудительно завершает процесс приложения. """
+    #     if window_name in self.processes:
+    #         self.processes[window_name].terminate()
+    #         del self.processes[window_name]
+    #         print(f"Процесс {window_name} завершён принудительно.")
 
 
     def switch_window(self, window_name):
@@ -1518,7 +1503,7 @@ class MacOSWindow(QMainWindow):
                 elif window_name == "settings":
                     self.open_windows[window_name] = SettingsWindow(self, "settings")
                 else:
-                    print(f"Ошибка: Неизвестное окно {window_name}")
+                    # print(f"Ошибка: Неизвестное окно {window_name}")
                     return
 
             window = self.open_windows[window_name]

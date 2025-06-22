@@ -1,0 +1,12 @@
+{
+  "Shutdown": "Вимкнути",
+  "Reboot": "Перезавантажити",
+  "Lock": "Заблокувати",
+  "Password": "Пароль",
+  "Power": "Power",
+  "Enter URL or search": "Введіть URL або пошуковий запит",
+  "New Tab": "Нова вкладка",
+  "Incorrect password!": "Неправильний пароль!",
+  "Error": "Помилка",
+  "Error_wifi": "Wi-Fi адаптер не знайдено"
+}

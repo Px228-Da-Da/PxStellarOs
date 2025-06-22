@@ -1,13 +1,8 @@
-from PyQt6.QtWidgets import (
-    QVBoxLayout, QWidget, QLabel, QListWidget, QStackedWidget, QPushButton, 
-    QHBoxLayout, QMessageBox, QFileDialog, QInputDialog, QComboBox
-)
-from apps.local.init import DraggableResizableWindow
-from updater import get_current_version, get_latest_version, update_application, UPDATE_BRANCHES
-import shutil
+import sys
 import os
-import platform
-import datetime
+from updater import get_current_version, get_latest_version, update_application, UPDATE_BRANCHES
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin")))
+from dependencies import *
 
 class SettingsWindow(DraggableResizableWindow):
     def __init__(self, parent=None, window_name=""):
@@ -207,7 +202,7 @@ class SettingsWindow(DraggableResizableWindow):
                 f"Обновление завершено (ветка {self.branch_combo.currentText()}). Перезапустите приложение."
             )
             self.rollback_button.setEnabled(True)
-            # self.reboot_system()  # Раскомментируйте, если нужно автоматически перезагружать
+            self.reboot_system()  # Раскомментируйте, если нужно автоматически перезагружать
         else:
             self.current_version_label.setText("Ошибка при обновлении. Попытка отката...")
             if self.rollback_update():

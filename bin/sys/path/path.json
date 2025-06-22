@@ -1,0 +1,24 @@
+{
+    "paths": [
+        "sys/class_",
+        "sys/class_/win/system_class/animations",
+        "sys/class_/win/system_class/errors",
+        "sys/class_/win/system_class/styles",
+        "sys/class_/win/Widgets",
+        "sys/updates",
+        "../apps/local"
+    ],
+    "update_settings": {
+        "version_file": "bin/sys/updates/version.txt",
+        "requirements_file": "bin/sys/updates/requirements.txt",
+        "github_urls": {
+            "version": "https://raw.githubusercontent.com/Px228-Da-Da/PxStellarOs/{branch}/version.txt",
+            "zip": "https://github.com/Px228-Da-Da/PxStellarOs/archive/refs/heads/{branch}.zip"
+        },
+        "temp_folder": "temp_update",
+        "branches": {
+            "Master": "master",
+            "Testing": "testing"
+        }
+    }
+}

@@ -1,8 +1,15 @@
 import sys
 import os
+import shutil
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin")))
 from dependencies import *
+
+with open("bin/sys/path/path.json", "r", encoding="utf-8") as f:
+    path_data = json.load(f)
+    file_paths = path_data.get("files_path", [])
+    files = {os.path.basename(p): p for p in file_paths}
+
 
 def global_exception_handler(exctype, value, tb):
     """Глобальный обработчик исключений."""
@@ -33,6 +40,14 @@ def global_exception_handler(exctype, value, tb):
 # disabled_btn = CustomButton("Неактивна кнопка", style='contained', enabled=False)
 # layout.addWidget(disabled_btn)
 
+def load_stylesheet(path):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception as e:
+        print(f"Не вдалося завантажити стилі: {e}")
+        return ""
+
 
 class MacOSWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
@@ -55,32 +70,20 @@ class MacOSWindow(QMainWindow):
         # Инициализация Wi-Fi
         self.wifi = pywifi.PyWiFi()
         self.iface = None
+
+        stylesheet = load_stylesheet("styles.qss")
+        self.setStyleSheet(stylesheet)
         
         try:
             if self.wifi.interfaces():
                 self.iface = self.wifi.interfaces()[0]
             else:
-                QMessageBox.warning(self, self.tr("Error"), self.tr("Error_wifi"))
+                StellarMessageBox.warning(self, self.tr("Error"), self.tr("Error_wifi"))
         except Exception as e:
-            QMessageBox.warning(self, self.tr("Error"), f"Error initialization Wi-Fi: {str(e)}")
+            StellarMessageBox.warning(self, self.tr("Error"), f"Error initialization Wi-Fi: {str(e)}")
         try:
-            self.desk_config = "root/user/desk/desk.config"
+            self.desk_config = files.get("desk.config", "root/user/desk/desk.config")
             self.active_windows = {}
-
-            # Загружаем курсор из файла Normal.cur
-            icon_dir_cursors = os.path.join("bin", "icons", "local_icons", "cursors", "Normal.cur")
-            cursor_pixmap = QPixmap(icon_dir_cursors)  # Загружаем изображение курсора
-
-            # Уменьшаем размер курсора (например, в 2 раза)
-            new_width = cursor_pixmap.width() // 2
-            new_height = cursor_pixmap.height() // 2
-            scaled_pixmap = cursor_pixmap.scaled(new_width, new_height, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-
-            # Создаем курсор с точкой наведения (0, 0)
-            cursor = QCursor(scaled_pixmap, hotX=0, hotY=0)  # Устанавливаем hotspot на (0, 0)
-            
-            # Устанавливаем курсор для главного окна
-            self.setCursor(cursor)
             
             # Настройки главного окна
             self.setWindowTitle("OS")
@@ -102,6 +105,7 @@ class MacOSWindow(QMainWindow):
             
             # Рабочий стол (прозрачный)
             self.create_desktop_window()
+            self.create_start_menu()
 
             # self.create_wifi_button()
 
@@ -121,8 +125,6 @@ class MacOSWindow(QMainWindow):
             
             # Создаем экран блокировки
             self.create_lock_screen()
-            # Создаем черный экран с логотипом
-            # self.create_splash_screen()
         except Exception as e:
             # Если ошибка происходит в конструкторе, показываем её в DeathScreen
             self.show_death_screen(f"Critical error in constructor: {str(e)}")
@@ -130,7 +132,7 @@ class MacOSWindow(QMainWindow):
     def load_translations(self, language_code):
         """Завантажує файл перекладу за кодом мови."""
         import json
-        translation_path = os.path.join("translations", f"{language_code}.json")
+        translation_path = files.get(f"{language_code}.json", os.path.join("bin", "lang", language_code, f"{language_code}.json"))
         try:
             with open(translation_path, "r", encoding="utf-8") as f:
                 self.translations = json.load(f)
@@ -144,7 +146,6 @@ class MacOSWindow(QMainWindow):
     def tr(self, key):
         """Повертає перекладений текст або ключ, якщо не знайдено."""
         return self.translations.get(key, key)
-
 
     def create_volume_button(self):
         """Создает кнопку громкости в правом нижнем углу"""
@@ -164,17 +165,8 @@ class MacOSWindow(QMainWindow):
         # Создаем кнопку
         self.volume_button = QPushButton()
         self.volume_button.setFixedSize(60, 60)
-        self.volume_button.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(255, 255, 255, 0.25);
-                border-radius: 16px;
-                border: 1px solid rgba(255, 255, 255, 0.3);
-                padding: 0;
-            }
-            QPushButton:hover {
-                background-color: rgba(255, 255, 255, 0.35);
-            }
-        """)
+
+        self.volume_button.setObjectName("volume_button")
         
         # Иконка громкости
         self.volume_icon = QLabel(self.volume_button)
@@ -187,10 +179,7 @@ class MacOSWindow(QMainWindow):
         # Создаем виджет управления громкостью (изначально скрыт)
         self.volume_widget = VolumeControlWidget()
         self.volume_widget.setParent(self)
-        # self.volume_widget.move(
-        #     self.width() - 370,  # Позиционируем слева от кнопки
-        #     self.height() - 140  # Позиционируем выше кнопки
-        # )
+
         self.volume_widget.hide()
         
         # Подключаем клик по кнопке громкости
@@ -289,19 +278,9 @@ class MacOSWindow(QMainWindow):
         # Создаем кнопку
         self.time_button = QPushButton()
         self.time_button.setFixedSize(120, 60)
-        self.time_button.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(255, 255, 255, 0.25);
-                border-radius: 16px;
-                border: 1px solid rgba(255, 255, 255, 0.3);
-                padding: 0;
-                color: white;
-                font-size: 12px;
-            }
-            QPushButton:hover {
-                background-color: rgba(255, 255, 255, 0.35);
-            }
-        """)
+
+        self.time_button.setObjectName("time_button")
+
         
         # Лэйаут для текста внутри кнопки
         text_layout = QVBoxLayout(self.time_button)
@@ -311,23 +290,14 @@ class MacOSWindow(QMainWindow):
         # Метка для времени
         self.time_button_time = QLabel()
         self.time_button_time.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.time_button_time.setStyleSheet("""
-            QLabel {
-                color: white;
-                font-size: 14px;
-                font-weight: bold;
-            }
-        """)
+
+        self.time_button_time.setObjectName("time_button_time")
         
         # Метка для даты
         self.time_button_date = QLabel()
         self.time_button_date.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.time_button_date.setStyleSheet("""
-            QLabel {
-                color: white;
-                font-size: 14px;
-            }
-        """)
+
+        self.time_button_date.setObjectName("time_button_date")
         
         text_layout.addWidget(self.time_button_time)
         text_layout.addWidget(self.time_button_date)
@@ -479,16 +449,8 @@ class MacOSWindow(QMainWindow):
 
         # Метка для отображения времени (часы:минуты:секунды)
         self.time_label = QLabel(self.lock_widget)
-        self.time_label.setStyleSheet("""
-            QLabel {
-                color: white;
-                font-size: 18px;
-                font-weight: bold;
-                background-color: rgba(0, 0, 0, 100);
-                padding: 5px 10px;
-                border-radius: 5px;
-            }
-        """)
+
+        self.time_label.setObjectName("time_label")
         self.time_label.setGeometry(10, 10, 150, 30)  # Левый верхний угол
         self.update_time_label()  # Установить начальное значение
 
@@ -498,7 +460,7 @@ class MacOSWindow(QMainWindow):
         self.clock_timer.start(1000)  # 1000 мс = 1 секунда
 
         # Поле ввода пароля
-        self.password_input = Input(
+        self.password_input = InputPassword(
             parent=self.lock_widget,
             placeholder_text=self.tr("Password"),
             initial_text="",  # Можно указать заранее введённый текст, если нужно
@@ -519,15 +481,8 @@ class MacOSWindow(QMainWindow):
         self.main_button.setIcon(QIcon(os.path.join("bin", "icons", "local_icons", "IconOs", "shutdown.png")))  # Укажите путь к изображению
         self.main_button.setIconSize(QSize(50, 50))
         self.main_button.setFixedSize(50, 50)
-        self.main_button.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                border: none;
-            }
-            QPushButton:hover {
-                background: rgba(255, 255, 255, 0.1);
-            }
-        """)
+
+        self.main_button.setObjectName("main_button")
         self.main_button.move((self.width() - 50) // 2, logo_label.y() + logo_label.height() + 80)
         self.main_button.clicked.connect(self.toggle_additional_buttons)
 
@@ -539,11 +494,8 @@ class MacOSWindow(QMainWindow):
             150,  # Ширина контейнера
             100   # Высота контейнера
         )
-        self.additional_buttons_container.setStyleSheet("""
-            background: rgba(0, 0, 0, 150); 
-            border-radius: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.2);  /* Обводка контейнера */
-        """)
+
+        self.additional_buttons_container.setObjectName("additional_buttons_container")
         self.additional_buttons_container.hide()  # Скрываем контейнер по умолчанию
 
         # Вертикальный лэйаут для дополнительных кнопок
@@ -557,22 +509,8 @@ class MacOSWindow(QMainWindow):
         self.button1.setIconSize(QSize(30, 30))  # Размер иконки
         self.button1.setFixedSize(120, 40)  # Размер кнопки (ширина, высота)
         self.button1.clicked.connect(self.shutdown_system)  # Используем clicked.connect
-        self.button1.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                border: 1px solid rgba(255, 255, 255, 0.2);  /* Обводка кнопки */
-                color: white;  /* Белый цвет текста */
-                font-size: 14px;  /* Размер шрифта */
-                padding-left: 10px;  /* Отступ слева для текста */
-                text-align: left;  /* Выравнивание текста по левому краю */
-            }
-            QPushButton:hover {
-                background: rgba(255, 255, 255, 0.1);  /* Фон при наведении */
-            }
-            QPushButton::icon {
-                color: white;  /* Белый цвет иконки */
-            }
-        """)
+
+        self.button1.setObjectName("shutdown_button")
         additional_layout.addWidget(self.button1)  # Добавляем кнопку в лэйаут
 
         # Вторая дополнительная кнопка
@@ -581,22 +519,8 @@ class MacOSWindow(QMainWindow):
         self.button2.setIconSize(QSize(30, 30))  # Размер иконки
         self.button2.setFixedSize(120, 40)  # Размер кнопки (ширина, высота)
         self.button2.clicked.connect(self.reboot_system)  # Используем clicked.connect
-        self.button2.setStyleSheet("""
-            QPushButton {
-                background: transparent;
-                border: 1px solid rgba(255, 255, 255, 0.2);  /* Обводка кнопки */
-                color: white;  /* Белый цвет текста */
-                font-size: 14px;  /* Размер шрифта */
-                padding-left: 10px;  /* Отступ слева для текста */
-                text-align: left;  /* Выравнивание текста по левому краю */
-            }
-            QPushButton:hover {
-                background: rgba(255, 255, 255, 0.1);  /* Фон при наведении */
-            }
-            QPushButton::icon {
-                color: white;  /* Белый цвет иконки */
-            }
-        """)
+
+        self.button2.setObjectName("reboot_button")
         additional_layout.addWidget(self.button2)  # Добавляем кнопку в лэйаут
 
         # Обработчики событий для скрытия/показа контейнера
@@ -671,48 +595,11 @@ class MacOSWindow(QMainWindow):
                 self.animation.start()
             else:
                 # Показываем сообщение об ошибке
-                QMessageBox.warning(self, self.tr("Error"), self.tr("Incorrect password!"))
+                StellarMessageBox.warning(self, self.tr("Error"), self.tr("Incorrect password!"))
         except RuntimeError:
             # Если объект уже удален, просто выходим из метода
             return
 
-
-    def create_splash_screen(self):
-        self.is_splash_screen_active = True  # Устанавливаем флаг загрузочного экрана
-        # Создаем виджет для черного экрана
-        self.splash_widget = QWidget(self)
-        self.splash_widget.setGeometry(0, 0, self.width(), self.height())
-        self.splash_widget.setStyleSheet("background-color: black;")
-
-        # Логотип
-        # icon_dir_path = os.path.join("bin", "icons", "local_icons", "IconOs", "OS.png")
-        # logo_pixmap = QPixmap(icon_dir_path)
-
-        # # Уменьшаем размер изображения логотипа (например, в 2 раза)
-        # new_width = logo_pixmap.width() // 2
-        # new_height = logo_pixmap.height() // 2
-        # scaled_pixmap = logo_pixmap.scaled(new_width, new_height, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-
-        # logo_label = QLabel(self.splash_widget)
-        # logo_label.setPixmap(scaled_pixmap)
-        # logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # logo_label.setGeometry(
-        #     (self.width() - scaled_pixmap.width()) // 2,
-        #     (self.height() - scaled_pixmap.height()) // 2 - 50,  # Сдвигаем логотип выше, чтобы освободить место для прогресс-бара
-        #     scaled_pixmap.width(),
-        #     scaled_pixmap.height()
-        # )
-
-        # Таймер для задержки перед анимацией
-        self.timer = QTimer()
-        self.timer.setSingleShot(True)  # Таймер сработает только один раз
-        self.timer.timeout.connect(self.start_animation)  # Подключаем слот для запуска анимации
-        self.timer.start(5000)  # Задержка 8 секунд
-
-        # Таймер для обновления прогресс-бара
-        self.progress_timer = QTimer()
-        self.progress_timer.timeout.connect(self.update_progress)
-        self.progress_timer.start(80)  # Обновляем прогресс-бар каждые 80 мс (примерно 8 секунд до 100%)
 
     def update_progress(self):
         # Обновляем значение прогресс-бара
@@ -802,7 +689,6 @@ class MacOSWindow(QMainWindow):
                 self.background.setPixmap(pixmap)
                 self.background.setGeometry(0, 0, self.width(), self.height())
         except Exception as e:
-            # print(f"Ошибка загрузки фона: {e}")
             pass
 
 
@@ -819,14 +705,6 @@ class MacOSWindow(QMainWindow):
         self.switch_window(next_window_name)
         self.active_window_name = next_window_name
 
-
-    # def create_all_windows(self):
-    #     self.open_windows["browser"] = BrowserWindow(self, "browser")
-    #     self.open_windows["cmd"] = CmdWindow(self, "cmd")
-    #     self.open_windows["settings"] = SettingsWindow(self, "settings")
-
-    #     # self.open_windows["settings"] = self.create_settings_window()
-
     def create_all_windows(self):
         """
         Инициализация окон. Окна создаются только при первом открытии.
@@ -835,34 +713,19 @@ class MacOSWindow(QMainWindow):
             "browser": None,
             "cmd": None,
             "settings": None,
+            "calc": None,
+            "explorer": None,
+            "notebook": None,
         }
-        self.open_windows["browser"] = BrowserWindow(self, "browser", translator=self.tr)
+
 
     def create_menu(self):
         """
         Создает меню с использованием QMenuBar и добавляет время/дату в правый угол.
         """
         menubar = self.menuBar()
+        menubar.setObjectName("main_menu_bar")
 
-        # Устанавливаем стиль меню
-        menubar.setStyleSheet("""
-            QMenuBar {
-                background-color: #D1D1D1;  /* Цвет, как у док-панели */
-                color: black;
-                background-color: rgba(255, 255, 255, 0.25);
-                border-radius: 16px;
-                border: 1px solid rgba(255, 255, 255, 0.3);
-                padding: 0;
-                font-size: 14px;
-            }
-            QMenuBar::item {
-                background: transparent;
-                padding: 5px 10px;
-            }
-            QMenuBar::item:selected {
-                background: #B1B1B1;  /* Цвет фона для выбранного пункта */
-            }
-        """)
 
         # Меню "Win" (динамически изменяет название на активное окно)
         self.win_menu = menubar.addMenu("Win")
@@ -902,13 +765,28 @@ class MacOSWindow(QMainWindow):
         menubar.setCornerWidget(self.time_label, Qt.Corner.TopRightCorner)
     
     def keyPressEvent(self, event: QKeyEvent):
+        """Обробляє натискання клавіш у глобальному контексті"""
+        if hasattr(self, "start_menu") and self.start_menu.isVisible():
+            if event.text():  # перевірка, що це текстовий символ
+                self.search_box.setFocus()
+                cursor = self.search_box.cursorPosition()
+                current_text = self.search_box.text()
+                # вставляємо символ у поточну позицію курсора
+                self.search_box.setText(current_text[:cursor] + event.text() + current_text[cursor:])
+                self.search_box.setCursorPosition(cursor + 1)
+                return  # не передаємо подію далі
         if self.is_locked or self.is_splash_screen_active:
-            return
+            return super().keyPressEvent(event)
 
         current_time = QDateTime.currentMSecsSinceEpoch()
         
-        # Win + L
-        if event.key() == Qt.Key.Key_L and event.modifiers() & Qt.KeyboardModifier.MetaModifier:
+        # Ctrl key - открытие/закрытие меню
+        if event.key() == Qt.Key.Key_Control:
+            self.toggle_start_menu()
+            return
+        
+        # Ctrl + L (вместо Win + L)
+        if event.key() == Qt.Key.Key_L and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             self.lock_screen()
         # Alt + Shift
         elif ((event.key() == Qt.Key.Key_Shift and event.modifiers() & Qt.KeyboardModifier.AltModifier) or
@@ -973,15 +851,7 @@ class MacOSWindow(QMainWindow):
             self.current_layout_label.deleteLater()
         
         self.current_layout_label = QLabel(text, self)
-        self.current_layout_label.setStyleSheet("""
-            QLabel {
-                background-color: rgba(0, 0, 0, 180);
-                color: white;
-                padding: 5px 10px;
-                border-radius: 5px;
-                font-size: 14px;
-            }
-        """)
+        self.current_layout_label.setObjectName("current_layout_label")
         self.current_layout_label.adjustSize()
         self.current_layout_label.move(self.width() - self.current_layout_label.width() - 20, 20)
         self.current_layout_label.show()
@@ -995,8 +865,211 @@ class MacOSWindow(QMainWindow):
             self.current_layout_label.deleteLater()
             self.current_layout_label = None
 
+    def create_start_menu(self):
+        """Створює меню 'Пуск' у стилі Windows 10 з пошуком і динамічною висотою"""
+        all_apps = self.get_available_apps()
+
+        self.start_menu = QWidget(self)
+        self.start_menu.setObjectName("win10StartMenu")
+        self.start_menu.setFixedWidth(400)
+        self.start_menu.setStyleSheet("background-color: rgba(40, 40, 40, 0.95); border-radius: 10px;")
+
+        layout = QHBoxLayout(self.start_menu)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        # Ліва панель
+        left_panel = QWidget()
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(10, 10, 10, 10)
+        left_layout.setSpacing(10)
+
+        # Пошук
+        self.search_box = QLineEdit()  # Сохраняем как атрибут класса
+        self.search_box.setPlaceholderText("Пошук...")
+        self.search_box.setStyleSheet("""
+            QLineEdit {
+                font-size: 16px;
+                padding: 8px;
+                border-radius: 5px;
+                background-color: rgba(255, 255, 255, 0.1);
+                color: white;
+                border: 1px solid #4bcfff;
+            }
+        """)
+        left_layout.addWidget(self.search_box)
+
+        all_apps_label = QLabel("Усі додатки")
+        all_apps_label.setStyleSheet("color: white; font-size: 14px; margin-top: 10px;")
+        left_layout.addWidget(all_apps_label)
+
+        # Список застосунків
+        apps_scroll = QScrollArea()
+        apps_scroll.setWidgetResizable(True)
+        apps_scroll.setStyleSheet("background: transparent; border: none;")
+        apps_scroll.setVerticalScrollBar(CastScrollBar(Qt.Orientation.Vertical))
+        apps_scroll.setHorizontalScrollBar(CastScrollBar(Qt.Orientation.Horizontal))
+        
+        self.apps_widget = QWidget()
+        self.apps_list_layout = QVBoxLayout(self.apps_widget)
+        self.apps_list_layout.setSpacing(5)
+
+        self.app_buttons = []  # Зберігаємо кнопки для фільтрації
+
+        for app in all_apps:
+            btn = QPushButton(app["name"])
+            btn.setIcon(QIcon(app["icon"]))
+            btn.setIconSize(QSize(40, 40))
+            btn.setStyleSheet("""
+                QPushButton {
+                    text-align: left;
+                    padding: 6px;
+                    font-size: 14px;
+                    color: white;
+                    background: transparent;
+                    border: none;
+                }
+                QPushButton:hover {
+                    background: rgba(255, 255, 255, 0.1);
+                    border-radius: 5px;
+                }
+            """)
+            btn.clicked.connect(lambda _, a=app["id"]: self.handle_app_launch(a))
+            self.apps_list_layout.addWidget(btn)
+            self.app_buttons.append((btn, app["name"].lower()))
+
+        apps_scroll.setWidget(self.apps_widget)
+        left_layout.addWidget(apps_scroll)
+        layout.addWidget(left_panel, 2)
+
+        # Додаємо пошук
+        def filter_apps():
+            text = self.search_box.text().lower()
+            for btn, name in self.app_buttons:
+                btn.setVisible(text in name)
+
+            # Оновлюємо висоту меню під видимі кнопки
+            self.update_start_menu_height()
+
+        self.search_box.textChanged.connect(filter_apps)
+
+        # Підрахунок початкової висоти
+        self.start_menu.setFixedHeight(self.calculate_start_menu_height(len(all_apps)))
+        self.start_menu.move(0, self.height() - self.start_menu.height())
+        self.start_menu.hide()
+        self.start_menu.is_showing = False
+        # Фільтр подій для закриття при кліку поза меню
+        self.start_menu.installEventFilter(self)
+        QApplication.instance().installEventFilter(self)
+
+    def handle_app_launch(self, app_id):
+        """Обработчик запуска приложения"""
+        self.hide_menu()
+        self.switch_window(app_id)
+
+    def calculate_start_menu_height(self, num_buttons):
+        """Обчислює висоту меню залежно від кількості кнопок"""
+        min_height = 260  # 🔺 Раніше було 200
+        max_visible = 10
+        button_height = 44  # 🔺 Раніше було 35
+        padding = 140  # 🔺 Раніше було 120
+        total = min(num_buttons, max_visible) * button_height + padding
+        return max(total, min_height)
+
+    def eventFilter(self, source, event):
+        """Закриває меню, якщо клік поза меню 'Пуск'"""
+        if hasattr(self, 'start_menu') and self.start_menu.isVisible():
+            if event.type() == QEvent.Type.MouseButtonPress:
+                if source != self.start_menu and not self.start_menu.geometry().contains(event.globalPosition().toPoint()):
+                    self.hide_menu()
+        return super().eventFilter(source, event)
+
+    def update_start_menu_height(self):
+        """Оновлює висоту меню на основі видимих кнопок"""
+        visible_count = sum(1 for btn, _ in self.app_buttons if btn.isVisible())
+        new_height = self.calculate_start_menu_height(visible_count)
+        self.start_menu.setFixedHeight(new_height)
+        self.start_menu.move(0, self.height() - new_height)
 
 
+
+    def get_available_apps(self):
+        """Повертає список доступних застосунків та копіює іконки в icons_apps"""
+        apps = []
+        apps_dir = os.path.join("apps", "local")
+        output_dir = "bin/icons/local_icons/inons_apps"
+
+        if os.path.exists(apps_dir):
+            for app_id in os.listdir(apps_dir):
+                app_path = os.path.join(apps_dir, app_id)
+                if os.path.isdir(app_path):
+                    config_path = os.path.join(app_path, "config.json")
+                    icon_src = os.path.join(app_path, "icon.png")
+                    app_name = app_id.capitalize()
+
+                    # Читаємо ім’я з config.json (якщо є)
+                    if os.path.exists(config_path):
+                        try:
+                            with open(config_path, "r", encoding="utf-8") as f:
+                                config = json.load(f)
+                                app_name = config.get("name", app_name)
+                        except Exception as e:
+                            print(f"Помилка читання {config_path}: {e}")
+
+                    # Копіюємо іконку
+                    icon_dest_folder = os.path.join(output_dir, app_id)
+                    icon_dest_path = os.path.join(icon_dest_folder, "icon.png")
+                    if os.path.exists(icon_src):
+                        try:
+                            os.makedirs(icon_dest_folder, exist_ok=True)
+                            shutil.copyfile(icon_src, icon_dest_path)
+                        except Exception as e:
+                            print(f"Не вдалося скопіювати іконку {app_id}: {e}")
+                    else:
+                        print(f"Іконка не знайдена: {icon_src}")
+
+                    apps.append({
+                        "id": app_id,
+                        "name": app_name,
+                        "icon": icon_dest_path if os.path.exists(icon_dest_path) else ""
+                    })
+
+        return apps
+
+
+    def show_menu(self):
+        """Показывает меню с анимацией"""
+        if not self.start_menu.is_showing:
+            self.start_menu.show()
+            self.start_menu.raise_()
+            
+            # Анимация появления (из прозрачного в непрозрачное)
+            self.menu_animation = QPropertyAnimation(self.start_menu, b"windowOpacity")
+            self.menu_animation.setDuration(200)
+            self.menu_animation.setStartValue(0)
+            self.menu_animation.setEndValue(1)
+            self.menu_animation.start()
+            
+            self.start_menu.is_showing = True
+
+    def hide_menu(self):
+        """Скрывает меню с анимацией"""
+        if self.start_menu.is_showing:
+            # Анимация исчезновения (из непрозрачного в прозрачное)
+            self.menu_animation = QPropertyAnimation(self.start_menu, b"windowOpacity")
+            self.menu_animation.setDuration(200)
+            self.menu_animation.setStartValue(1)
+            self.menu_animation.setEndValue(0)
+            self.menu_animation.finished.connect(self.start_menu.hide)
+            self.menu_animation.start()
+            
+            self.start_menu.is_showing = False
+
+    def toggle_start_menu(self):
+        """Переключает состояние меню"""
+        if self.start_menu.is_showing:
+            self.hide_menu()
+        else:
+            self.show_menu()
     
     def create_window_switch_menu(self):
         """Создает меню для переключения между открытыми окнами."""
@@ -1104,14 +1177,6 @@ class MacOSWindow(QMainWindow):
                 }
             """)
 
-    def update_time(self):
-        """
-        Обновляет время и дату в метке.
-        """
-        # current_time = QTime.currentTime()
-        # current_date = QDate.currentDate()
-        # self.time_label.setText(f"{current_time.toString('hh:mm:ss')}  {current_date.toString('dd.MM.yyyy')}")
-        pass
 
     def create_wifi_button(self):
         """Создает кнопку Wi-Fi в правом нижнем углу"""
@@ -1154,76 +1219,7 @@ class MacOSWindow(QMainWindow):
         # Создаем виджет Wi-Fi (изначально скрыт)
         self.wifi_window = WifiWindow()
         self.wifi_window.setParent(self)
-        self.wifi_window.setStyleSheet("""
-            QWidget {
-                background-color: rgba(30, 30, 30, 0.9);
-                color: white;
-                border-radius: 8px;
-            }
-            QPushButton {
-                background-color: transparent;
-                color: white;
-                font-size: 18px;
-                border: none;
-                padding: 5px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: rgba(255, 255, 255, 0.1);
-            }
-            QPushButton:pressed {
-                background-color: rgba(255, 255, 255, 0.2);
-            }
-            #header {
-                background-color: transparent;
-                color: white;
-                border-top-left-radius: 8px;
-                border-top-right-radius: 8px;
-                padding: 10px;
-            }
-            #monthYearLabel {
-                font-size: 16px;
-                font-weight: bold;
-                color: white;
-            }
-            #weekdays {
-                font-size: 12px;
-                font-weight: bold;
-                color: rgba(255, 255, 255, 0.8);
-                padding: 5px 0;
-            }
-            .day {
-                font-size: 14px;
-                border-radius: 4px;
-                min-width: 30px;
-                min-height: 30px;
-                color: white;
-            }
-            .day:hover {
-                background-color: rgba(255, 255, 255, 0.1);
-            }
-            .current-day {
-                background-color: rgba(255, 255, 255, 0.3);
-                color: white;
-                font-weight: bold;
-            }
-            .selected-day {
-                background-color: rgba(255, 255, 255, 0.4);
-                color: white;
-                font-weight: bold;
-            }
-            .other-month {
-                color: rgba(255, 255, 255, 0.5);
-            }
-            .nav-button {
-                border-radius: 4px;
-                padding: 5px 10px;
-                font-size: 16px;
-            }
-            .nav-button:hover {
-                background-color: rgba(255, 255, 255, 0.2);
-            }
-        """)
+        self.wifi_window.setObjectName("wifi_window")
         self.wifi_window.hide()
         
         # Подключаем клик по кнопке Wi-Fi
@@ -1303,24 +1299,15 @@ class MacOSWindow(QMainWindow):
         """)
         self.main_layout.addWidget(self.desktop)
 
-
     def create_dock_panel(self):
         """Стилизация док-панели в стиле macOS с динамическим размером"""
         self.dock_buttons = {}
         self.active_windows = {}
+        self.dynamic_dock_buttons = {}  # Для хранения динамически добавленных кнопок
 
         # Создаем фрейм для док-панели
         self.dock = QFrame()
-
-        # Стили с эффектом тени
-        self.dock.setStyleSheet("""
-            QFrame {
-                background-color: rgba(255, 255, 255, 0.25);
-                border-radius: 16px;
-                border: 1px solid rgba(255, 255, 255, 0.3);
-                padding: 0;
-            }
-        """)
+        self.dock.setObjectName("dock")
 
         # Эффект тени
         shadow = QGraphicsDropShadowEffect()
@@ -1330,92 +1317,40 @@ class MacOSWindow(QMainWindow):
         self.dock.setGraphicsEffect(shadow)
 
         # Настройка лэйаута
-        dock_layout = QHBoxLayout()
-        dock_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        dock_layout.setSpacing(15)
-        dock_layout.setContentsMargins(10, 2, 10, 2)
+        self.dock_layout = QHBoxLayout()
+        self.dock_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.dock_layout.setSpacing(15)
+        self.dock_layout.setContentsMargins(10, 2, 10, 2)
 
-        # Чтение конфигурации из файла
-        dock_config_path = os.path.join("root", "bin", "dock.config")
-        icons = []
+        # Чтение конфигурации из файла dock.config
+        dock_config_path = files.get("dock.config", os.path.join("root", "bin", "dock.config"))
+        self.allowed_apps = []
         
         try:
             with open(dock_config_path, "r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if line and not line.startswith("#"):  # Пропускаем пустые строки и комментарии
-                        parts = line.split(":")
-                        if len(parts) >= 2:
-                            icon_name = parts[0].strip()
-                            window_name = parts[1].strip()
-                            icons.append((icon_name, window_name))
+                        self.allowed_apps.append(line)
         except FileNotFoundError:
-            # print(f"Файл конфигурации {dock_config_path} не найден. Используются настройки по умолчанию.")
-            # Конфигурация по умолчанию
-            icons = [
-                ("app_store", "desktop"),
-                ("safari", "browser"),
-                ("settings", "settings"),
-                ("cmd", "cmd")
-            ]
+            print(f"Файл конфигурации {dock_config_path} не найден. Используются настройки по умолчанию.")
+            self.allowed_apps = ["browser", "settings", "cmd"]  # Приложения по умолчанию
         except Exception as e:
-            # print(f"Ошибка при чтении файла конфигурации: {e}")
-            icons = [
-                ("app_store", "desktop"),
-                ("safari", "browser"),
-                ("settings", "settings"),
-                ("cmd", "cmd")
-            ]
+            print(f"Ошибка при чтении файла конфигурации: {e}")
+            self.allowed_apps = ["browser", "settings", "cmd"]  # Приложения по умолчанию
 
-        button_size = 44  # Размер кнопки
-        dock_padding = 20  # Отступы док-панели
-        dock_spacing = 15  # Промежуток между кнопками
-        dock_width = len(icons) * (button_size + dock_spacing) + dock_padding * 2
-        self.dock.setFixedSize(dock_width, 65)  # Устанавливаем ширину док-панели
+        # Создаем кнопки для стандартных приложений
+        for app_name in self.allowed_apps:
+            self._add_dock_button(app_name)
 
-        for icon_name, window_name in icons:
-            icon_path = os.path.join("bin", "icons", "local_icons", "local_apps", icon_name, f"{icon_name}.png")
-
-            if not os.path.exists(icon_path):
-                # print(f"Ошибка: Иконка {icon_path} не найдена!")
-                continue
-
-            btn = JumpingButton(icon_path=icon_path, parent=self)
-            btn.setFixedSize(button_size, button_size)
-            btn.setIconSize(QSize(50, 50))
-            btn.clicked.connect(lambda _, n=window_name: self.switch_window(n))
-
-            # Добавляем эффект тени для кнопки
-            btn_shadow = QGraphicsDropShadowEffect()
-            btn_shadow.setBlurRadius(10)
-            btn_shadow.setColor(QColor(0, 0, 0, 100))
-            btn_shadow.setOffset(2, 2)
-            btn.setGraphicsEffect(btn_shadow)
-
-            indicator = QLabel()
-            indicator.setFixedSize(20, 4)
-            indicator.setStyleSheet("background: transparent; border: none; border-radius: 2px;")
-
-            # Контейнер для кнопки и индикатора
-            container = QWidget()  # Создаем контейнерный виджет
-            container_layout = QVBoxLayout(container)
-            container_layout.setContentsMargins(0, 8, 0, 0)
-            container_layout.setSpacing(5)
-            container_layout.addWidget(btn, alignment=Qt.AlignmentFlag.AlignCenter)
-            container_layout.addWidget(indicator, alignment=Qt.AlignmentFlag.AlignHCenter)
-
-            # Поднимаем кнопку на верхний слой
-            btn.raise_()
-
-            # Добавляем контейнер в док-панель
-            dock_layout.addWidget(container)
-
-            self.dock_buttons[window_name] = (btn, indicator)
-
-        self.dock.setLayout(dock_layout)
+        self.dock.setLayout(self.dock_layout)
         self.main_layout.addWidget(self.dock, alignment=Qt.AlignmentFlag.AlignHCenter)
 
-
+    def update_time(self):
+        """
+        Обновляет время и дату в метке.
+        """
+        pass
 
 
     def toggle_window(self, window_name):
@@ -1434,106 +1369,134 @@ class MacOSWindow(QMainWindow):
             # print(f"Окно {window_name} не открыто. Открываем...")
             self.open_windows[window_name] = getattr(self, f"create_{window_name}_window")()
             self.open_windows[window_name].show()
+
+    def _add_dock_button(self, app_name):
+        """Добавляет кнопку в док-панель"""
+        if app_name in self.dock_buttons:
+            return  # Кнопка уже существует
+
+        button_size = 44  # Размер кнопки
+        
+        # Пути к иконке приложения (пробуем несколько вариантов)
+        possible_icon_paths = [
+            os.path.join("apps", "local", app_name, f"{app_name}.png"),
+            os.path.join("apps", "local", f"{app_name}.png"),
+            os.path.join("apps", "local", app_name, "icon.png")
+        ]
+        
+        icon_path = None
+        for path in possible_icon_paths:
+            if os.path.exists(path):
+                icon_path = path
+                break
+        
+        if not icon_path:
+            print(f"Иконка для {app_name} не найдена по путям: {possible_icon_paths}")
+            return
+
+        btn = JumpingButton(icon_path=icon_path, parent=self)
+        btn.setFixedSize(button_size, button_size)
+        btn.setIconSize(QSize(50, 50))
+        btn.clicked.connect(lambda _, n=app_name: self.switch_window(n))
+        
+        # Устанавливаем прозрачный фон для кнопки
+        btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                border: none;
+                padding: 0;
+                margin: 0;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.2);
+                border-radius: 8px;
+            }
+        """)
+
+        # Добавляем эффект тени для кнопки
+        btn_shadow = QGraphicsDropShadowEffect()
+        btn_shadow.setBlurRadius(10)
+        btn_shadow.setColor(QColor(0, 0, 0, 100))
+        btn_shadow.setOffset(2, 2)
+        btn.setGraphicsEffect(btn_shadow)
+
+        indicator = QLabel()
+        indicator.setFixedSize(20, 4)
+        indicator.setStyleSheet("background: transparent; border: none; border-radius: 2px;")
+
+        # Контейнер для кнопки и индикатора
+        container = QWidget()
+        container.setStyleSheet("background: transparent;")  # Прозрачный фон контейнера
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(0, 8, 0, 0)
+        container_layout.setSpacing(5)
+        container_layout.addWidget(btn, alignment=Qt.AlignmentFlag.AlignCenter)
+        container_layout.addWidget(indicator, alignment=Qt.AlignmentFlag.AlignHCenter)
+
+        self.dock_layout.addWidget(container)
+        self.dock_buttons[app_name] = (btn, indicator)
+        
+        # Обновляем размер дока
+        dock_padding = 20  # Отступы док-панели
+        dock_spacing = 15  # Промежуток между кнопками
+        dock_width = len(self.dock_buttons) * (button_size + dock_spacing) + dock_padding * 2
+        self.dock.setFixedSize(dock_width, 65)
             
-
-
-    # def show_context_menu(self, window_name, button):
-    #     """
-    #     Показывает контекстное меню при нажатии правой кнопкой мыши на иконку в док-панели.
-    #     """
-    #     menu = QMenu()
-
-    #     # Опции меню
-    #     action_pin = QAction("Закрепить на панели задач", self)
-    #     action_close = QAction("Закрыть окно", self)
-    #     action_kill = QAction("Завершить задачу", self)
-
-    #     # Привязка действий к кнопкам
-    #     action_close.triggered.connect(lambda: self.close_window(window_name))
-    #     action_kill.triggered.connect(lambda: self.force_close_window(window_name))
-
-    #     # Добавление опций в меню
-    #     menu.addAction(action_pin)
-    #     menu.addAction(action_kill)
-    #     menu.addAction(action_close)
-
-    #     # Отображение меню под кнопкой
-    #     menu.exec(button.mapToGlobal(QPoint(0, button.height())))
-
-    # def close_window(self, window_name):
-    #     """ Закрывает окно, если оно открыто. """
-    #     window = self.open_windows.get(window_name)
-    #     if window:
-    #         window.close()
-    #         self.open_windows[window_name] = None
-    #         print(f"Окно {window_name} закрыто.")
-
-    # def force_close_window(self, window_name):
-    #     """ Принудительно завершает процесс приложения. """
-    #     if window_name in self.processes:
-    #         self.processes[window_name].terminate()
-    #         del self.processes[window_name]
-    #         print(f"Процесс {window_name} завершён принудительно.")
-
-
     def switch_window(self, window_name):
         window_name = window_name.strip()
 
-        # Снимаем выделение со всех кнопок
-        for name, (button, _) in self.dock_buttons.items():
-            button.setStyleSheet("")  # Сбрасываем стиль кнопки
+        # Если окно не в доке, добавляем его
+        if window_name not in self.dock_buttons and window_name not in self.dynamic_dock_buttons:
+            self._add_dynamic_dock_button(window_name)
 
-        if window_name.lower() == "desktop":  # Проверяем, является ли это рабочим столом
-            for win in self.open_windows.values():
-                if win:
-                    win.hide()  # Скрываем все открытые окна
-            self.active_window_name = "desktop"
-            self.update_win_menu("desktop")  # Обновляем заголовок меню
-            self.update_dock_indicators()  # Обновляем индикаторы в доке
-            return
+        # Снимаем выделение со всех кнопок
+        for name, (button, _) in {**self.dock_buttons, **self.dynamic_dock_buttons}.items():
+            button.setStyleSheet("")
 
         # Проверяем, есть ли окно в self.open_windows
         if window_name in self.open_windows:
             if self.open_windows[window_name] is None:
-                # Создаем окно только при первом открытии
-                if window_name == "browser":
-                    self.open_windows[window_name] = BrowserWindow(self, "browser")
-                elif window_name == "cmd":
-                    self.open_windows[window_name] = CmdWindow(self, "cmd")
-                elif window_name == "settings":
-                    self.open_windows[window_name] = SettingsWindow(self, "settings")
-                else:
-                    # print(f"Ошибка: Неизвестное окно {window_name}")
+                # Динамически загружаем модуль приложения из apps/local
+                try:
+                    module_name = f"apps.local.{window_name}.{window_name}"
+                    module = __import__(module_name, fromlist=[window_name])
+                    app_class = getattr(module, f"{window_name.capitalize()}Window")
+                    
+                    # Создаем экземпляр приложения с передачей языка и переводчика
+                    self.open_windows[window_name] = app_class(
+                        parent=self,
+                        window_name=window_name,
+                        translator=self.tr,
+                        lang_code=self.current_language  # Передаем текущий язык
+                    )
+                except Exception as e:
+                    print(f"Ошибка загрузки приложения {window_name}: {e}")
                     return
 
             window = self.open_windows[window_name]
 
-            # Проверяем, что window не None перед вызовом isMinimized()
             if window is not None:
-                if window.minimized:  # Проверяем, свернуто ли окно
-                    window.restore_window()  # Восстанавливаем окно
+                if hasattr(window, 'minimized') and window.minimized:
+                    window.restore_window()
                 else:
-                    if window.isMinimized():  # Если окно свернуто стандартным способом
+                    if window.isMinimized():
                         window.showNormal()
                         window.activateWindow()
                     else:
-                        # Анимация открытия окна
                         self.animate_window_open(window)
                         window.show()
                         window.raise_()
                         window.activateWindow()
+                        window.activate()
 
                 self.active_window_name = window_name
-                self.update_win_menu(window_name)  # Обновляем название в меню "Win"
-
-                # Устанавливаем флаг активности и обновляем индикаторы в доке
+                self.update_win_menu(window_name)
                 self.active_windows[window_name] = True
                 self.update_dock_indicators()
 
-                # Выделяем активную кнопку
-                if window_name in self.dock_buttons:
-                    button, _ = self.dock_buttons[window_name]
-                    button.setStyleSheet("background-color: #181818; border-radius: 8px;")  # Выделяем активную кнопку
+                if window_name in {**self.dock_buttons, **self.dynamic_dock_buttons}:
+                    button, _ = {**self.dock_buttons, **self.dynamic_dock_buttons}[window_name]
+                    button.setStyleSheet("background-color: #181818; border-radius: 8px;")
 
     def animate_window_open(self, window):
         """Анимация открытия окна"""
@@ -1554,6 +1517,80 @@ class MacOSWindow(QMainWindow):
         # Запускаем анимацию
         self.animation.start()
 
+    def _add_dynamic_dock_button(self, app_name):
+        """Добавляет временную кнопку в док-панель для нестандартных приложений"""
+        if app_name in self.dynamic_dock_buttons:
+            return  # Кнопка уже существует
+
+        button_size = 44  # Размер кнопки
+        
+        # Пути к иконке приложения (пробуем несколько вариантов)
+        possible_icon_paths = [
+            os.path.join("apps", "local", app_name, f"{app_name}.png"),
+            os.path.join("apps", "local", f"{app_name}.png"),
+            os.path.join("apps", "local", app_name, "icon.png"),
+            os.path.join("bin", "icons", "local_icons", "system", "default_app.png")  # Иконка по умолчанию
+        ]
+        
+        icon_path = None
+        for path in possible_icon_paths:
+            if os.path.exists(path):
+                icon_path = path
+                break
+        
+        if not icon_path:
+            print(f"Иконка для {app_name} не найдена по путям: {possible_icon_paths}")
+            return
+
+        btn = JumpingButton(icon_path=icon_path, parent=self)
+        btn.setFixedSize(button_size, button_size)
+        btn.setIconSize(QSize(50, 50))
+        btn.clicked.connect(lambda _, n=app_name: self.switch_window(n))
+        
+        # Устанавливаем прозрачный фон для кнопки
+        btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                border: none;
+                padding: 0;
+                margin: 0;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.2);
+                border-radius: 8px;
+            }
+        """)
+
+        # Добавляем эффект тени для кнопки
+        btn_shadow = QGraphicsDropShadowEffect()
+        btn_shadow.setBlurRadius(10)
+        btn_shadow.setColor(QColor(0, 0, 0, 100))
+        btn_shadow.setOffset(2, 2)
+        btn.setGraphicsEffect(btn_shadow)
+
+        indicator = QLabel()
+        indicator.setFixedSize(20, 4)
+        indicator.setStyleSheet("background: transparent; border: none; border-radius: 2px;")
+
+        # Контейнер для кнопки и индикатора
+        container = QWidget()
+        container.setStyleSheet("background: transparent;")  # Прозрачный фон контейнера
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(0, 8, 0, 0)
+        container_layout.setSpacing(5)
+        container_layout.addWidget(btn, alignment=Qt.AlignmentFlag.AlignCenter)
+        container_layout.addWidget(indicator, alignment=Qt.AlignmentFlag.AlignHCenter)
+
+        self.dock_layout.addWidget(container)
+        self.dynamic_dock_buttons[app_name] = (btn, indicator)
+        
+        # Обновляем размер дока
+        dock_padding = 20  # Отступы док-панели
+        dock_spacing = 15  # Промежуток между кнопками
+        dock_width = (len(self.dock_buttons) + len(self.dynamic_dock_buttons)) * (button_size + dock_spacing) + dock_padding * 2
+        self.dock.setFixedSize(dock_width, 65)
+
+
 
     def update_dock_indicators(self):
         """
@@ -1562,6 +1599,7 @@ class MacOSWindow(QMainWindow):
         if not hasattr(self, 'active_windows'):
             self.active_windows = {}
             
+        # Обновляем индикаторы для стандартных кнопок
         for window_name, (button, indicator) in self.dock_buttons.items():
             if self.active_windows.get(window_name, False):
                 indicator.setStyleSheet("""
@@ -1575,6 +1613,35 @@ class MacOSWindow(QMainWindow):
                     background-color: transparent;
                     border: none;
                 """)
+        
+        # Сначала собираем список окон для удаления
+        windows_to_remove = []
+        for window_name, (button, indicator) in self.dynamic_dock_buttons.items():
+            if window_name in self.open_windows and self.open_windows[window_name] is not None and not self.open_windows[window_name].isHidden():
+                indicator.setStyleSheet("""
+                    background-color: #4bcfff;
+                    border: none;
+                    border-radius: 22px;
+                    min-height: 4px;
+                """)
+            else:
+                windows_to_remove.append(window_name)
+        
+        # Затем удаляем собранные окна
+        for window_name in windows_to_remove:
+            if window_name in self.dynamic_dock_buttons:
+                container = self.dynamic_dock_buttons[window_name][0].parent()
+                self.dock_layout.removeWidget(container)
+                container.deleteLater()
+                del self.dynamic_dock_buttons[window_name]
+                
+        # Обновляем размер дока
+        button_size = 44
+        dock_padding = 20
+        dock_spacing = 15
+        dock_width = (len(self.dock_buttons) + len(self.dynamic_dock_buttons)) * (button_size + dock_spacing) + dock_padding * 2
+        self.dock.setFixedSize(dock_width, 65)
+
 
 
 if __name__ == "__main__":

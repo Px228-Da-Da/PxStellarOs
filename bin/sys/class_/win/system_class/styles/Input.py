@@ -10,7 +10,7 @@ class Input(QLineEdit):
         parent=None,
         placeholder_text="Password",
         initial_text="",
-        echo_mode=QLineEdit.EchoMode.Password
+        echo_mode=QLineEdit.EchoMode.Normal  # Изменено с Password на Normal
     ):
         super().__init__(parent)
 

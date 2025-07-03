@@ -8,11 +8,26 @@
         "sys/updates",
         "../apps/local"
     ],
+    "files_path": [
+        "root/user/desk/desk.config",
+        "bin/lang/en/en.json",
+        "bin/lang/uk/uk.json",
+        "root/bin/dock.config"
+    ],
+    "inons": [
+        "bin/icons/local_icons/system/volume.png",
+        "bin/icons/local_icons/system/",
+        "bin/icons/local_icons/IconOs/lock.jpg",
+        "bin/icons/local_icons/IconOs/OS.png",
+        "bin/icons/local_icons/IconOs/reboot.png",
+        "bin/icons/local_icons/IconOs/shutdown.png",
+        "bin/icons/local_icons/system/wifi.png"
+    ],
     "update_settings": {
         "version_file": "bin/sys/updates/version.txt",
         "requirements_file": "bin/sys/updates/requirements.txt",
         "github_urls": {
-            "version": "https://raw.githubusercontent.com/Px228-Da-Da/PxStellarOs/{branch}/version.txt",
+            "version": "https://raw.githubusercontent.com/Px228-Da-Da/PxStellarOs/{branch}/bin/sys/updates/version.txt",
             "zip": "https://github.com/Px228-Da-Da/PxStellarOs/archive/refs/heads/{branch}.zip"
         },
         "temp_folder": "temp_update",

@@ -1,0 +1,211 @@
+/* Загальний стиль кнопок */
+QPushButton#volume_button,
+QPushButton#time_button,
+QPushButton#wifi_button {
+    background-color: rgba(255, 255, 255, 0.25);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 0;
+}
+QPushButton#volume_button:hover,
+QPushButton#time_button:hover,
+QPushButton#wifi_button:hover {
+    background-color: rgba(255, 255, 255, 0.35);
+}
+
+/* Кнопка блокування */
+QPushButton#main_button {
+    background: transparent;
+    border: none;
+}
+QPushButton#main_button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Кнопки завершення та перезавантаження */
+QPushButton.shutdown_button, QPushButton.reboot_button {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    font-size: 14px;
+    padding-left: 10px;
+    text-align: left;
+}
+QPushButton.shutdown_button:hover,
+QPushButton.reboot_button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+QPushButton.shutdown_button::icon,
+QPushButton.reboot_button::icon {
+    color: white;
+}
+
+/* Метки з часом і датою */
+QLabel#time_button_time {
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+}
+QLabel#time_button_date {
+    color: white;
+    font-size: 14px;
+}
+
+/* Нотіфікація розкладки */
+QLabel#layout_notification {
+    background-color: rgba(0, 0, 0, 180);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+QLabel#time_label {
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+    background-color: rgba(0, 0, 0, 100);
+    padding: 5px 10px;
+    border-radius: 5px;
+}
+
+QLabel#current_layout_label {
+    background-color: rgba(0, 0, 0, 180);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+/* Меню */
+QMenuBar {
+    background-color: rgba(255, 255, 255, 0.25);
+    color: black;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 0;
+    font-size: 14px;
+}
+QMenuBar::item {
+    background: transparent;
+    padding: 5px 10px;
+}
+QMenuBar::item:selected {
+    background: #B1B1B1;
+}
+
+QWidget#additional_buttons_container {
+    background: rgba(0, 0, 0, 150); 
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.2);  /* Обводка контейнера */
+}
+
+/* Wi-Fi вікно */
+QWidget#wifi_window {
+    background-color: rgba(30, 30, 30, 0.9);
+    color: white;
+    border-radius: 8px;
+}
+QPushButton#wifi_window QPushButton {
+    background-color: transparent;
+    color: white;
+    font-size: 18px;
+    border: none;
+    padding: 5px;
+    border-radius: 4px;
+}
+QPushButton#wifi_window QPushButton:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+QPushButton#wifi_window QPushButton:pressed {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+#header {
+    background-color: transparent;
+    color: white;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    padding: 10px;
+}
+#monthYearLabel {
+    font-size: 16px;
+    font-weight: bold;
+    color: white;
+}
+#weekdays {
+    font-size: 12px;
+    font-weight: bold;
+    color: rgba(255, 255, 255, 0.8);
+    padding: 5px 0;
+}
+.day {
+    font-size: 14px;
+    border-radius: 4px;
+    min-width: 30px;
+    min-height: 30px;
+    color: white;
+}
+.day:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+.current-day {
+    background-color: rgba(255, 255, 255, 0.3);
+    color: white;
+    font-weight: bold;
+}
+.selected-day {
+    background-color: rgba(255, 255, 255, 0.4);
+    color: white;
+    font-weight: bold;
+}
+.other-month {
+    color: rgba(255, 255, 255, 0.5);
+}
+.nav-button {
+    border-radius: 4px;
+    padding: 5px 10px;
+    font-size: 16px;
+}
+.nav-button:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Dock панель */
+QFrame#dock {
+    background-color: rgba(255, 255, 255, 0.25);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 0;
+}
+QPushButton.dock_button {
+    background-color: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+QPushButton.dock_button:hover {
+    background-color: #B1B1B1;
+    border-radius: 8px;
+}
+QPushButton.dock_button.active {
+    background-color: #181818;
+    border-radius: 8px;
+}
+
+QPushButton#time_button {
+    background-color: rgba(255, 255, 255, 0.25);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 0;
+    color: white;
+    font-size: 12px;
+}
+QPushButton#time_button:hover {
+    background-color: rgba(255, 255, 255, 0.35);
+}
+
+
+
+#linuxStartMenu {
+    background: transparent;
+}

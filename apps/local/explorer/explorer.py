@@ -233,6 +233,7 @@ class ExplorerWindow(DraggableResizableWindow):
         self.status_bar.setContentsMargins(5, 2, 5, 2)
 
         self.status_label = QLabel("")
+        self.status_label.setStyleSheet("""color: #fff;""")
         self.status_label.setFont(QFont("Noto Sans", 9))
         self.status_bar.addWidget(self.status_label, 1)
 

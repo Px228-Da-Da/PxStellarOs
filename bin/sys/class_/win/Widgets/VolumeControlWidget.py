@@ -1,9 +1,15 @@
 import sys
 import os
+import platform
+from PyQt6.QtWidgets import QWidget, QLabel, QSlider, QVBoxLayout, QApplication
+from PyQt6.QtGui import QColor, QPalette, QLinearGradient, QBrush
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QPainter, QBrush, QLinearGradient, QColor
+from PyQt6.QtCore import Qt, QRectF
+
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin")))
-from dependencies import *
-
+from dependencies import *  # если нужно
 
 class VolumeControlWidget(QWidget):
     def __init__(self, parent=None):
@@ -20,11 +26,11 @@ class VolumeControlWidget(QWidget):
                 from ctypes import cast, POINTER
                 from comtypes import CLSCTX_ALL
                 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
-                
+
                 devices = AudioUtilities.GetSpeakers()
                 interface = devices.Activate(
-                    IAudioEndpointVolume._iid_, 
-                    CLSCTX_ALL, 
+                    IAudioEndpointVolume._iid_,
+                    CLSCTX_ALL,
                     None
                 )
                 self.volume = cast(interface, POINTER(IAudioEndpointVolume))
@@ -36,16 +42,17 @@ class VolumeControlWidget(QWidget):
             self.volume = None
             self.pulse = None
 
+
     def init_ui(self):
         """Инициализация интерфейса"""
         self.setWindowTitle("Громкость")
         self.resize(350, 100)
+
+        # Делаем окно без рамок и с прозрачным фоном
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Window)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+
         self.setStyleSheet("""
-            QWidget {
-                background-color: rgba(30, 30, 30, 0.9);
-                color: white;
-                border-radius: 8px;
-            }
             QSlider::groove:horizontal {
                 border: 1px solid #999999;
                 height: 6px;
@@ -79,7 +86,7 @@ class VolumeControlWidget(QWidget):
         main_layout.setSpacing(10)
 
         self.title_label = QLabel("Громкость")
-        self.title_label.setStyleSheet("font-size: 16px; font-weight: bold;")
+        self.title_label.setStyleSheet("font-size: 16px; font-weight: bold; color: white;")
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(self.title_label)
 
@@ -89,10 +96,28 @@ class VolumeControlWidget(QWidget):
         main_layout.addWidget(self.volume_slider)
 
         self.volume_label = QLabel("100%")
+        self.volume_label.setStyleSheet("color: white;")
         self.volume_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(self.volume_label)
 
         self.update_volume()
+
+    def paintEvent(self, event):
+        """Рисуем закруглённый фон"""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # Градиент или однотонный фон
+        gradient = QLinearGradient(0, 0, self.width(), self.height())
+        gradient.setColorAt(0, QColor(30, 30, 30))
+        gradient.setColorAt(1, QColor(20, 20, 20))
+
+        painter.setBrush(QBrush(gradient))
+        painter.setPen(Qt.PenStyle.NoPen)
+
+        rect = QRectF(0, 0, self.width(), self.height())
+        painter.drawRoundedRect(rect, 15, 15)  # радиус закругления
+
 
     def get_current_volume(self):
         """Получает текущую громкость в зависимости от ОС"""
@@ -129,7 +154,7 @@ class VolumeControlWidget(QWidget):
                 if self.pulse:
                     sink = self.pulse.get_sink_by_name(self.pulse.server_info().default_sink_name)
                     self.pulse.volume_set_all_chans(sink, volume_level)
-            
+
             self.volume_label.setText(f"{value}%")
         except Exception as e:
             print(f"Volume set error: {e}")
@@ -148,3 +173,10 @@ class VolumeControlWidget(QWidget):
         elif self.pulse:
             self.pulse.close()
             self.pulse = None
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = VolumeControlWidget()
+    window.show()
+    sys.exit(app.exec())

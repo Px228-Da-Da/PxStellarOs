@@ -39,16 +39,17 @@ class WifiWindow(QWidget):
         super().__init__()
         self.password_manager = WifiPasswordManager()
         self.setWindowTitle("Wi-Fi")
-        self.setFixedSize(360, 450)
+        self.setFixedSize(350, 450)
         self.setStyleSheet("""
             QWidget {
-                background-color: rgba(245, 245, 245, 220);
+                background-color: rgba(30, 30, 30, 225);
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
                 font-size: 14px;
+                color: #fff;
             }
             QListWidget {
-                background-color: rgba(255, 255, 255, 180);
-                border: 1px solid #ccc;
+                background-color: rgba(30, 30, 30, 225);
+                border: 1px solid #1c1c1c;
                 padding: 4px;
             }
             QListWidget::item {
@@ -56,16 +57,18 @@ class WifiWindow(QWidget):
                 border-bottom: 1px solid #e0e0e0;
             }
             QListWidget::item:selected {
-                background-color: rgba(0, 122, 255, 50);
+                background-color: rgba(30, 30, 30, 225);
                 border-radius: 6px;
             }
             QPushButton {
                 background-color: #eeeeee;
                 padding: 6px;
                 border-radius: 6px;
+                color: #000;
             }
             QPushButton:hover {
                 background-color: #dddddd;
+                color: #000;
             }
         """)
 
@@ -97,7 +100,10 @@ class WifiWindow(QWidget):
         layout.addLayout(toggle_layout)
 
         self.network_list = QListWidget()
+        self.network_list.setVerticalScrollBar(CastScrollBar(Qt.Orientation.Vertical))
+        self.network_list.setHorizontalScrollBar(CastScrollBar(Qt.Orientation.Horizontal))
         self.network_list.itemClicked.connect(self.connect_to_selected_network)
+
         layout.addWidget(self.network_list)
 
         self.setLayout(layout)
@@ -107,6 +113,22 @@ class WifiWindow(QWidget):
 
         self.update_current_network()
         self.scan_networks()
+
+    def paintEvent(self, event):
+        """Рисуем закруглённый фон"""
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # Градиент или однотонный фон
+        gradient = QLinearGradient(0, 0, self.width(), self.height())
+        gradient.setColorAt(0, QColor(30, 30, 30))
+        gradient.setColorAt(1, QColor(20, 20, 20))
+
+        painter.setBrush(QBrush(gradient))
+        painter.setPen(Qt.PenStyle.NoPen)
+
+        rect = QRectF(0, 0, self.width(), self.height())
+        painter.drawRoundedRect(rect, 15, 15)  # радиус закругления
 
     def toggle_wifi(self, enabled):
         if enabled:

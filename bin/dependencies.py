@@ -47,13 +47,16 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 
 from PyQt6.QtGui import (
     QIcon, QColor, QEnterEvent, QMouseEvent, QKeyEvent, QCursor, QPixmap,
-    QPainter, QBrush, QFont, QAction, QGuiApplication
+    QPainter, QBrush, QFont, QAction, QGuiApplication,
+    QPainter, QBrush, QLinearGradient, QColor, QPalette, QLinearGradient
 )
 
 from PyQt6.QtCore import (
     Qt, QSize, QRect, QEvent, QPropertyAnimation, QEasingCurve, QTimer,
-    QTime, QDate, QUrl, QPoint, QProcess, pyqtProperty, QDateTime, QParallelAnimationGroup
+    QTime, QDate, QUrl, QPoint, QProcess, pyqtProperty, QDateTime, QParallelAnimationGroup,
+    QRectF
 )
+
 
 from bin.sys.class_.win.init import DraggableResizableWindow
 

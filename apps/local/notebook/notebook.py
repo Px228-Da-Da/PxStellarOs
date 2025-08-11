@@ -55,6 +55,8 @@ class NotebookWindow(DraggableResizableWindow):
         # Текстова область
         self.text_edit = QTextEdit()
         self.content_layout.addWidget(self.text_edit)
+        self.text_edit.setVerticalScrollBar(CastScrollBar(Qt.Orientation.Vertical))
+        self.text_edit.setHorizontalScrollBar(CastScrollBar(Qt.Orientation.Horizontal))
 
         self.text_edit.setStyleSheet("""
             QTextEdit {

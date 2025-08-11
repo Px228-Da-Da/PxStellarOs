@@ -9,7 +9,7 @@ from dependencies import *
 class CalendarWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Календарь в стиле Windows 11")
+        # self.setWindowTitle("Календарь в стиле Windows 11")
         self.resize(350, 350)
         self.setStyleSheet("""
             QWidget {

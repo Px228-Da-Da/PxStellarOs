@@ -716,6 +716,7 @@ class MacOSWindow(QMainWindow):
             "calc": None,
             "explorer": None,
             "notebook": None,
+            "app_store": None
         }
 
 
@@ -725,7 +726,6 @@ class MacOSWindow(QMainWindow):
         """
         menubar = self.menuBar()
         menubar.setObjectName("main_menu_bar")
-
 
         # Меню "Win" (динамически изменяет название на активное окно)
         self.win_menu = menubar.addMenu("Win")
@@ -748,6 +748,15 @@ class MacOSWindow(QMainWindow):
         lock_action = QAction(self.tr("Lock"), self)  # Кнопка блокировки
         lock_action.triggered.connect(self.lock_screen)  # Связываем с методом блокировки
         power_menu.addAction(lock_action)  # Добавляем в меню "Power"
+        
+        # Добавляем разделитель
+        power_menu.addSeparator()
+        
+        # Действие для закрытия приложения
+        quit_action = QAction(self.tr("Quit"), self)
+        # quit_action.setShortcut("Ctrl+Q")  # Горячая клавиша
+        quit_action.triggered.connect(self.close)  # Закрываем главное окно
+        power_menu.addAction(quit_action)
 
         # Создание метки для времени и даты
         self.time_label = QLabel()
@@ -780,24 +789,24 @@ class MacOSWindow(QMainWindow):
 
         current_time = QDateTime.currentMSecsSinceEpoch()
         
-        # Ctrl key - открытие/закрытие меню
-        if event.key() == Qt.Key.Key_Control:
+        # Win key (Meta) - открытие/закрытие меню
+        if event.key() == Qt.Key.Key_Meta:
             self.toggle_start_menu()
             return
         
-        # Ctrl + L (вместо Win + L)
-        if event.key() == Qt.Key.Key_L and event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+        # Win + L (вместо Ctrl + L)
+        if event.key() == Qt.Key.Key_L and event.modifiers() & Qt.KeyboardModifier.MetaModifier:
             self.lock_screen()
-        # Alt + Shift
+        # Alt + Shift (оставляем без изменений)
         elif ((event.key() == Qt.Key.Key_Shift and event.modifiers() & Qt.KeyboardModifier.AltModifier) or
              (event.key() == Qt.Key.Key_Alt and event.modifiers() & Qt.KeyboardModifier.ShiftModifier)):
             if current_time - self.last_layout_switch_time > self.layout_switch_delay:
                 self._switch_keyboard_layout()
                 self.last_layout_switch_time = current_time
-        # Alt + Tab
-        elif event.key() == Qt.Key.Key_Tab and event.modifiers() & Qt.KeyboardModifier.AltModifier:
+        # Win + Tab (вместо Alt + Tab)
+        elif event.key() == Qt.Key.Key_Tab and event.modifiers() & Qt.KeyboardModifier.MetaModifier:
             self.switch_to_next_window()
-        # Enter
+        # Enter (оставляем без изменений)
         elif event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
             self.unlock_screen()
         
@@ -1210,7 +1219,7 @@ class MacOSWindow(QMainWindow):
         
         # Иконка Wi-Fi
         self.wifi_icon = QLabel(self.wifi_button)
-        self.wifi_icon.setPixmap(QIcon(os.path.join("bin", "icons", "local_icons", "system", "wifi.png")).pixmap(30, 30))
+        self.wifi_icon.setPixmap(QIcon(os.path.join("bin", "icons", "local_icons", "system", "wifi", "wifi_signal_4.png")).pixmap(30, 30))
         self.wifi_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.wifi_icon.setGeometry(15, 15, 30, 30)
         
@@ -1498,6 +1507,22 @@ class MacOSWindow(QMainWindow):
                     button, _ = {**self.dock_buttons, **self.dynamic_dock_buttons}[window_name]
                     button.setStyleSheet("background-color: #181818; border-radius: 8px;")
 
+    def handle_app_hang(self, app_name):
+        """Обработчик зависания приложения."""
+        error_message = f"Приложение '{app_name}' не отвечает. Закрыть его?"
+        reply = StellarMessageBox.question(
+            self,
+            "Ошибка",
+            error_message,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            if app_name in self.open_windows:
+                self.open_windows[app_name].close()
+                self.open_windows[app_name] = None
+                self.update_dock_indicators()
+
     def animate_window_open(self, window):
         """Анимация открытия окна"""
         # Устанавливаем начальный размер окна (очень маленький)
@@ -1599,35 +1624,55 @@ class MacOSWindow(QMainWindow):
         if not hasattr(self, 'active_windows'):
             self.active_windows = {}
             
+        # Сначала собираем список окон для удаления
+        windows_to_remove = []
+        
         # Обновляем индикаторы для стандартных кнопок
         for window_name, (button, indicator) in self.dock_buttons.items():
-            if self.active_windows.get(window_name, False):
+            window = self.open_windows.get(window_name)
+            if window is not None and not window.isHidden():  # Окно открыто и не скрыто
                 indicator.setStyleSheet("""
                     background-color: #4bcfff;
                     border: none;
                     border-radius: 22px;
                     min-height: 4px;
                 """)
-            else:
+            elif window is not None and window.minimized:  # Окно свернуто
+                indicator.setStyleSheet("""
+                    background-color: #4bcfff;
+                    border: none;
+                    border-radius: 22px;
+                    min-height: 4px;
+                    opacity: 0.5;
+                """)
+            else:  # Окно закрыто
                 indicator.setStyleSheet("""
                     background-color: transparent;
                     border: none;
                 """)
         
-        # Сначала собираем список окон для удаления
-        windows_to_remove = []
+        # Обработка динамических кнопок
         for window_name, (button, indicator) in self.dynamic_dock_buttons.items():
-            if window_name in self.open_windows and self.open_windows[window_name] is not None and not self.open_windows[window_name].isHidden():
+            window = self.open_windows.get(window_name)
+            if window is None:  # Окно полностью закрыто
+                windows_to_remove.append(window_name)
+            elif not window.isHidden():  # Окно открыто и не скрыто
                 indicator.setStyleSheet("""
                     background-color: #4bcfff;
                     border: none;
                     border-radius: 22px;
                     min-height: 4px;
                 """)
-            else:
-                windows_to_remove.append(window_name)
+            elif window.minimized:  # Окно свернуто
+                indicator.setStyleSheet("""
+                    background-color: #4bcfff;
+                    border: none;
+                    border-radius: 22px;
+                    min-height: 4px;
+                    opacity: 0.5;
+                """)
         
-        # Затем удаляем собранные окна
+        # Удаляем кнопки для закрытых окон
         for window_name in windows_to_remove:
             if window_name in self.dynamic_dock_buttons:
                 container = self.dynamic_dock_buttons[window_name][0].parent()
@@ -1653,8 +1698,12 @@ if __name__ == "__main__":
         window = MacOSWindow()
         window.show()
 
+        # Таймер для проверки зависания
+        timer = QTimer()
+        timer.timeout.connect(lambda: None)  # Пустая функция для проверки отклика
+        timer.start(1000)  # Проверка каждую секунду
+
         sys.exit(app.exec())
     except Exception as e:
         # Если ошибка произошла до создания окна, показываем её в DeathScreen через временное окно
         global_exception_handler(type(e), e, e.__traceback__)
-

@@ -4,7 +4,10 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin")))
 from dependencies import *
 
-class Input(QLineEdit):
+from CustomContextMenu import CustomContextMenu, ContextMenuMixin, CustomTextEdit, CustomPlainTextEdit, CustomLineEdit
+
+
+class Input(QLineEdit, ContextMenuMixin):
     def __init__(
         self,
         parent=None,

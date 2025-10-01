@@ -209,3 +209,30 @@ QPushButton#time_button:hover {
 #linuxStartMenu {
     background: transparent;
 }
+
+
+/* === macOS-like QMenu === */
+QMenu#macMenu {
+    background: rgba(255,255,255,0.98);
+    border: 1px solid rgba(0,0,0,0.10);
+    border-radius: 12px;
+    padding: 6px;
+}
+QMenu#macMenu::item {
+    padding: 6px 14px;
+    border-radius: 8px;
+    color: #111;
+    background: transparent;
+}
+QMenu#macMenu::item:selected {
+    background: #2d64f0; /* accent */
+    color: white;
+}
+QMenu#macMenu::item:disabled {
+    color: rgba(0,0,0,0.35);
+    background: transparent;
+}
+QMenu#macMenu::icon { padding-left: 2px; padding-right: 8px; }
+QMenu#macMenu::indicator { width: 16px; height: 16px; margin-right: 8px; }
+QMenu#macMenu::separator { height: 1px; margin: 6px 10px; background: rgba(0,0,0,0.12); }
+QMenu#macMenu::right-arrow { margin-right: 6px; }

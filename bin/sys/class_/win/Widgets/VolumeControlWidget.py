@@ -12,8 +12,10 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin")))
 from dependencies import *  # если нужно
 
 class VolumeControlWidget(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, translator=None, lang_code="en"):
         super().__init__(parent)
+        self.tr = translator if translator else lambda x: x
+        self.lang_code = lang_code  # Сохраняем переданный язык
         self.pulse = None  # Для Linux
         self.volume = None  # Для Windows
         self.init_audio()
@@ -45,7 +47,7 @@ class VolumeControlWidget(QWidget):
 
     def init_ui(self):
         """Инициализация интерфейса"""
-        self.setWindowTitle("Громкость")
+        self.setWindowTitle(self.tr("Volume"))
         self.resize(350, 100)
 
         # Делаем окно без рамок и с прозрачным фоном
@@ -85,7 +87,7 @@ class VolumeControlWidget(QWidget):
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(10)
 
-        self.title_label = QLabel("Громкость")
+        self.title_label = QLabel(self.tr("Volume"))
         self.title_label.setStyleSheet("font-size: 16px; font-weight: bold; color: white;")
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(self.title_label)

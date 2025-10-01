@@ -18,6 +18,8 @@ from dependencies import *
 class ExplorerWindow(DraggableResizableWindow):
     def __init__(self, parent=None, window_name="Explorer", translator=None, lang_code="en"):
         super().__init__(parent)
+        self.tr = translator if translator else lambda x: x
+        self.lang_code = lang_code  # Сохраняем переданный язык
         self.parent_window = parent
         self.window_name = window_name
         self.lang_code = lang_code
@@ -198,7 +200,7 @@ class ExplorerWindow(DraggableResizableWindow):
         self.file_preview_label.setFixedSize(100, 100)
         
         # File details section
-        self.file_details_text = QTextEdit()
+        self.file_details_text = CustomTextEdit_cmd()
         self.file_details_text.setReadOnly(True)
         self.file_details_text.setStyleSheet("""
             QTextEdit {
@@ -279,29 +281,30 @@ class ExplorerWindow(DraggableResizableWindow):
         
         # Get file details
         details = []
-        details.append(f"Name: {os.path.basename(path)}")
+        details.append(f"{self.tr('Name')}: {os.path.basename(path)}")
         
         if os.path.isdir(path):
-            details.append("Type: File folder")
+            details.append(f"{self.tr('Type')}: {self.tr('File folder')}")
             try:
                 num_items = len(os.listdir(path))
-                details.append(f"Items: {num_items}")
+                details.append(f"{self.tr('Items')}: {num_items}")
             except:
                 pass
         else:
-            details.append(f"Type: {os.path.splitext(path)[1].upper()[1:] or 'File'}")
-            details.append(f"Size: {self.get_file_size(path)}")
+            file_type = os.path.splitext(path)[1].upper()[1:] or self.tr('File')
+            details.append(f"{self.tr('Type')}: {file_type}")
+            details.append(f"{self.tr('Size')}: {self.get_file_size(path)}")
             
         # Add date modified
         try:
             mtime = os.path.getmtime(path)
             dt = QDateTime.fromSecsSinceEpoch(int(mtime))
-            details.append(f"Modified: {dt.toString('yyyy-MM-dd hh:mm:ss')}")
+            details.append(f"{self.tr('Modified')}: {dt.toString('yyyy-MM-dd hh:mm:ss')}")
         except:
             pass
             
         # Add path
-        details.append(f"Path: {path}")
+        details.append(f"{self.tr('Path')}: {path}")
         
         self.file_details_text.setPlainText("\n".join(details))
 
@@ -318,9 +321,10 @@ class ExplorerWindow(DraggableResizableWindow):
             return "Unknown size"
 
     def show_context_menu(self, position: QPoint):
-        menu = CustomMenu()
+        menu = CustomContextMenu()
         selected_items = self.file_list.selectedItems()
 
+        # Основные действия
         new_file_action = menu.addAction(self.tr("New File"))
         new_file_action.triggered.connect(self.create_new_file)
 
@@ -337,9 +341,6 @@ class ExplorerWindow(DraggableResizableWindow):
                 rename_action = menu.addAction(self.tr("Rename"))
                 rename_action.triggered.connect(self.rename_item)
 
-                open_notebook_action = menu.addAction(self.tr("Open in Notebook"))
-                open_notebook_action.triggered.connect(lambda: self.open_in_notebook(selected_items[0]))
-
             copy_action = menu.addAction(self.tr("Copy"))
             copy_action.triggered.connect(lambda: self.copy_selected_items('copy'))
 
@@ -348,11 +349,155 @@ class ExplorerWindow(DraggableResizableWindow):
 
             menu.addSeparator()
 
+        # Новая кнопка: Open in CMD для папок
+        if len(selected_items) == 1 and os.path.isdir(selected_items[0].data(Qt.ItemDataRole.UserRole)):
+            open_cmd_action = menu.addAction(self.tr("Open in CMD"))
+            open_cmd_action.triggered.connect(lambda: self.open_in_cmd(selected_items[0]))
+
+        # Paste если есть что вставить
         if self.clipboard:
             paste_action = menu.addAction(self.tr("Paste"))
             paste_action.triggered.connect(self.paste_items)
 
+        # Open in Notebook / VSCode только для файлов в самом низу меню
+        if len(selected_items) == 1 and os.path.isfile(selected_items[0].data(Qt.ItemDataRole.UserRole)):
+            menu.addSeparator()
+            open_notebook_action = menu.addAction(self.tr("Open in Notebook"))
+            open_notebook_action.triggered.connect(lambda: self.open_in_notebook(selected_items[0]))
+
+            open_vscode_action = menu.addAction(self.tr("Open in VsCode"))
+            open_vscode_action.triggered.connect(lambda: self.open_in_vscode(selected_items[0]))
+
         menu.exec(self.file_list.viewport().mapToGlobal(position))
+
+
+    def open_in_cmd(self, item: QListWidgetItem):
+        """Открывает CMD в выбранной папке"""
+        path = item.data(Qt.ItemDataRole.UserRole)
+        if not os.path.isdir(path):
+            StellarMessageBox.warning(self, self.tr("Error"), self.tr("Selected item is not a folder"))
+            return
+
+        try:
+            cmd_window = None
+            
+            # Проверяем, существует ли окно CMD в родительском окне
+            if hasattr(self.parent_window, 'open_windows'):
+                cmd_window = self.parent_window.open_windows.get("cmd")
+                
+                # Если окно существует, но было закрыто, создаем новое
+                if cmd_window is not None and not hasattr(cmd_window, 'isVisible'):
+                    cmd_window = None
+                    self.parent_window.open_windows["cmd"] = None
+            
+            # Если CMD не существует, создаем новый экземпляр
+            if cmd_window is None:
+                try:
+                    # Динамически импортируем модуль CMD
+                    cmd_module = __import__("apps.local.cmd.cmd", fromlist=["CmdWindow"])
+                    CmdWindow = getattr(cmd_module, "CmdWindow")
+                    
+                    cmd_window = CmdWindow(
+                        parent=self.parent_window,
+                        window_name="CMD",
+                        translator=self.parent_window.tr if hasattr(self.parent_window, 'tr') else None,
+                        lang_code=getattr(self.parent_window, 'current_language', 'en')
+                    )
+                    
+                    # Сохраняем ссылку на CMD в родительском окне
+                    if hasattr(self.parent_window, 'open_windows'):
+                        self.parent_window.open_windows["cmd"] = cmd_window
+                except Exception as e:
+                    StellarMessageBox.warning(self, self.tr("Error"), 
+                                           self.tr("Could not create CMD window: {}").format(str(e)))
+                    return
+
+            # Меняем рабочую директорию в терминале и показываем окно
+            if hasattr(cmd_window, 'terminal') and hasattr(cmd_window.terminal, 'tabs'):
+                current_tab = cmd_window.terminal.tabs.currentWidget()
+                if current_tab and hasattr(current_tab, 'process'):
+                    # Отправляем команду смены директории в процесс терминала
+                    change_dir_command = f"cd /d \"{path}\"\n" if platform.system() == "Windows" else f"cd \"{path}\"\n"
+                    current_tab.process.write(change_dir_command.encode("utf-8"))
+                    
+                    # Показываем текущую директорию
+                    if platform.system() == "Windows":
+                        current_tab.process.write(b"cd\n")
+                    else:
+                        current_tab.process.write(b"pwd\n")
+            
+            cmd_window.show()
+            cmd_window.raise_()
+            cmd_window.activateWindow()
+            
+            # Обновляем родительское окно, если возможно
+            if hasattr(self.parent_window, 'switch_window'):
+                self.parent_window.switch_window("cmd")
+                
+        except Exception as e:
+            StellarMessageBox.warning(self, self.tr("Error"), 
+                                    self.tr("Could not open CMD in folder: {}").format(str(e)))
+
+    def open_in_vscode(self, item: QListWidgetItem):
+        path = item.data(Qt.ItemDataRole.UserRole)
+        if not os.path.isfile(path):
+            StellarMessageBox.warning(self, self.tr("Error"), self.tr("Selected item is not a file"))
+            return
+
+        try:
+            vscode = None
+
+            # Проверяем, существует ли окно vscode в родительском окне
+            if hasattr(self.parent_window, 'open_windows'):
+                vscode = self.parent_window.open_windows.get("vscode")
+
+                # Если окно существует, но было закрыто, создаем новое
+                if vscode is not None and not getattr(vscode, 'isVisible', lambda: False)():
+                    vscode = None
+                    self.parent_window.open_windows["vscode"] = None
+
+            # Если vscode не существует, создаем новый экземпляр
+            if vscode is None:
+                try:
+                    # Динамически импортируем модуль Vscode
+                    vscode_module = __import__("apps.local.Vscode.Vscode", fromlist=["VscodeWindow"])
+                    VscodeWindow = getattr(vscode_module, "VscodeWindow")
+
+                    vscode = VscodeWindow(
+                        parent=self.parent_window,
+                        window_name="VSCode",
+                        translator=getattr(self.parent_window, 'tr', None),
+                        lang_code=getattr(self.parent_window, 'current_language', 'en')
+                    )
+
+                    # Сохраняем ссылку на vscode в родительском окне
+                    if hasattr(self.parent_window, 'open_windows'):
+                        self.parent_window.open_windows["vscode"] = vscode
+                except Exception as e:
+                    StellarMessageBox.warning(
+                        self,
+                        self.tr("Error"),
+                        self.tr("Could not create VSCode window: {}").format(str(e))
+                    )
+                    return
+
+            # Загружаем файл и показываем vscode
+            if hasattr(vscode, 'open_file_by_path'):
+                vscode.open_file_by_path(path)
+                vscode.show()
+                vscode.raise_()
+                vscode.activateWindow()
+
+                # Обновляем родительское окно, если возможно
+                if hasattr(self.parent_window, 'switch_window'):
+                    self.parent_window.switch_window("vscode")
+
+        except Exception as e:
+            StellarMessageBox.warning(
+                self,
+                self.tr("Error"),
+                self.tr("Could not open file in VSCode: {}").format(str(e))
+            )
 
 
     def open_in_notebook(self, item: QListWidgetItem):

@@ -38,7 +38,7 @@ else:
 # PyQt6 импорты
 from PyQt6.QtWidgets import (
     QApplication, QScrollArea, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QFrame, QPushButton,
-    QLabel, QMessageBox, QStackedWidget, QMenuBar, QToolBar, QLineEdit, QTabWidget, QMenu,
+    QLabel, QMessageBox, QStackedWidget, QMenuBar, QToolBar, QLineEdit, QTabWidget, QMenu, QPlainTextEdit,
     QTextEdit, QCalendarWidget, QListWidget, QListWidgetItem, QProgressBar, QGridLayout, 
     QGraphicsDropShadowEffect, QSlider, QFileDialog, QInputDialog, QComboBox, QDialog, QGroupBox, QCheckBox
 )
@@ -78,9 +78,11 @@ from InputPassword import InputPassword
 from Button import Button
 from StellarMessageBox import StellarMessageBox
 from ScrollBar import CastScrollBar
-from Menu import CustomMenu
+from Menu import Menu
 from CustomInputDialog import CustomInputDialog
-
+from CustomContextMenu import CustomContextMenu, ContextMenuMixin, CustomTextEdit, CustomPlainTextEdit, CustomLineEdit, CustomContextMenu_cmd, ContextMenuMixin_cmd, CustomTextEdit_cmd, CustomPlainTextEdit_cmd, CustomLineEdit_cmd
+from FileListContextMenu import FileListContextMenu
+from CustomFileDialog import CustomFileDialog
 
 
 from CalendarWidget import CalendarWidget

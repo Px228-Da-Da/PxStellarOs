@@ -7,6 +7,10 @@ from dependencies import *
 from PyQt6.QtWidgets import QScrollBar
 from PyQt6.QtCore import Qt
 
+from CustomContextMenu import CustomContextMenu, ContextMenuMixin, CustomTextEdit, CustomPlainTextEdit, CustomLineEdit, CustomContextMenu_cmd, ContextMenuMixin_cmd, CustomTextEdit_cmd, CustomPlainTextEdit_cmd, CustomLineEdit_cmd
+
+
+
 class CastScrollBar(QScrollBar):
     def __init__(self, orientation, parent=None):
         super().__init__(orientation, parent)
@@ -93,13 +97,13 @@ class CastScrollBar(QScrollBar):
         """)
 
 
-class TerminalTab(QWidget):
+class TerminalTab(QWidget, ContextMenuMixin):
     def __init__(self):
         super().__init__()
         self.layout = QVBoxLayout()
 
         # Поле вывода
-        self.output = QTextEdit()
+        self.output = CustomTextEdit_cmd()
         self.output.setReadOnly(True)
         self.output.setStyleSheet("""
             background-color: #1e1e1e;  
@@ -114,7 +118,7 @@ class TerminalTab(QWidget):
 
 
         # Поле ввода
-        self.input = QLineEdit()
+        self.input = CustomLineEdit()
         self.input.setStyleSheet("""
             background-color: #252526;
             color: #dcdcdc;

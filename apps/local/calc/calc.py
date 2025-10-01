@@ -16,7 +16,7 @@ class CalcWindow(DraggableResizableWindow):
         
     def init_ui(self):
         # Создаем поле для вывода
-        self.display = QLineEdit()
+        self.display = CustomLineEdit_cmd()
         self.display.setAlignment(Qt.AlignmentFlag.AlignRight)
         self.display.setReadOnly(True)
         self.display.setStyleSheet("""

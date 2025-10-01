@@ -7,8 +7,10 @@ from dependencies import *
 
 
 class CalendarWidget(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, translator=None, lang_code="en"):
         super().__init__(parent)
+        self.tr = translator if translator else lambda x: x
+        self.lang_code = lang_code  # Сохраняем переданный язык
         # self.setWindowTitle("Календарь в стиле Windows 11")
         self.resize(350, 350)
         self.setStyleSheet("""
@@ -128,7 +130,8 @@ class CalendarWidget(QWidget):
         main_layout.addWidget(header)
         
         # Weekdays header
-        weekdays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
+        weekdays = [self.tr("Mon"), self.tr("Tue"), self.tr("Wed"), self.tr("Thu"), 
+                   self.tr("Fri"), self.tr("Sat"), self.tr("Sun")]
         weekdays_widget = QWidget()
         weekdays_widget.setObjectName("weekdays")
         weekdays_layout = QHBoxLayout(weekdays_widget)

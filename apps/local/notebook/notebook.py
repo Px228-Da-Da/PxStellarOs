@@ -18,6 +18,7 @@ class NotebookWindow(DraggableResizableWindow):
         self.parent_window = parent
         self.window_name = window_name
         self.lang_code = lang_code
+        self.current_file = None  # Добавляем инициализацию current_file
         
         # Set window properties
         self.setWindowTitle(self.tr("Notebook"))
@@ -52,12 +53,14 @@ class NotebookWindow(DraggableResizableWindow):
         separator.setFrameShadow(QFrame.Shadow.Sunken)
         main_layout.addWidget(separator)
 
-        # Текстова область
-        self.text_edit = QTextEdit()
+        # Заменяем QTextEdit на кастомный
+        self.text_edit = CustomTextEdit()
         self.content_layout.addWidget(self.text_edit)
+        
+        # Настройка скроллбаров (ваш существующий код)
         self.text_edit.setVerticalScrollBar(CastScrollBar(Qt.Orientation.Vertical))
         self.text_edit.setHorizontalScrollBar(CastScrollBar(Qt.Orientation.Horizontal))
-
+        
         self.text_edit.setStyleSheet("""
             QTextEdit {
                 background-color: #1e1e1e;
@@ -74,7 +77,6 @@ class NotebookWindow(DraggableResizableWindow):
         self.status_label = QLabel("    Ready")
         self.status_bar.addWidget(self.status_label)
         main_layout.addLayout(self.status_bar)
-
 
         self.setStyleSheet("""
             QWidget {
@@ -123,26 +125,36 @@ class NotebookWindow(DraggableResizableWindow):
         except Exception as e:
             print(f"Error loading file: {e}")
 
-
     def new_file(self):
         self.text_edit.clear()
         self.current_file = None
         self.status_label.setText("     New file created")
 
     def open_file(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Open File", "", "Text Files (*.txt);;All Files (*)")
+        file_path, _ = CustomFileDialog.getOpenFileName(
+            self, 
+            self.tr("Open File"), 
+            "", 
+            "Text Files (*.txt);;All Files (*)"
+        )
+
         if file_path:
             try:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     self.text_edit.setPlainText(f.read())
                 self.current_file = file_path
-                self.status_label.setText(f"    Opened: {os.path.basename(file_path)}")
+                self.status_label.setText(f"    {self.tr('Opened')}: {os.path.basename(file_path)}")
             except Exception as e:
-                self.status_label.setText(f"    Error: {str(e)}")
+                self.status_label.setText(f"    {self.tr('Error')}: {str(e)}")
 
     def save_file(self):
-        if not self.current_file:
-            file_path, _ = QFileDialog.getSaveFileName(self, "Save File", "", "Text Files (*.txt);;All Files (*)")
+        if not hasattr(self, 'current_file') or not self.current_file:
+            file_path, _ = CustomFileDialog.getSaveFileName(
+                self, 
+                self.tr("Save File"), 
+                "", 
+                "Text Files (*.txt);;All Files (*)"
+            )
             if not file_path:
                 return
             self.current_file = file_path
@@ -150,6 +162,6 @@ class NotebookWindow(DraggableResizableWindow):
         try:
             with open(self.current_file, 'w', encoding='utf-8') as f:
                 f.write(self.text_edit.toPlainText())
-            self.status_label.setText(f"    Saved: {os.path.basename(self.current_file)}")
+            self.status_label.setText(f"    {self.tr('Saved')}: {os.path.basename(self.current_file)}")
         except Exception as e:
-            self.status_label.setText(f"    Error: {str(e)}")
+            self.status_label.setText(f"    {self.tr('Error')}: {str(e)}")

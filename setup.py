@@ -1,6 +1,8 @@
 import sys
 import os
 import shutil
+# импорт наверху рядом с остальными:
+from PyQt6.QtCore import QMargins
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin")))
 from dependencies import *
@@ -47,6 +49,278 @@ def load_stylesheet(path):
     except Exception as e:
         print(f"Не вдалося завантажити стилі: {e}")
         return ""
+
+
+
+# --- ALT+TAB SWITCHER -------------------------------------------------
+from PyQt6.QtWidgets import QWidget, QLabel, QHBoxLayout, QVBoxLayout, QGraphicsDropShadowEffect, QScrollArea, QFrame
+from PyQt6.QtGui import QPixmap, QFont, QIcon
+from PyQt6.QtCore import Qt, QSize, QRect, QEasingCurve, QPropertyAnimation
+
+class _SwitchCard(QWidget):
+    def __init__(self, title: str, icon: QPixmap | None, selected=False, parent=None):
+        super().__init__(parent)
+        self.setProperty("sel", selected)
+        lay = QVBoxLayout(self); lay.setContentsMargins(10,10,10,10); lay.setSpacing(8)
+
+        self.thumb = QLabel()
+        self.thumb.setFixedSize(120, 120)  # Уменьшаем размер для иконки
+        self.thumb.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        if icon and not icon.isNull():
+            # Масштабируем иконку с сохранением пропорций
+            scaled_icon = icon.scaled(80, 80, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            self.thumb.setPixmap(scaled_icon)
+        else:
+            # Иконка по умолчанию если не найдена
+            default_icon = QPixmap(80, 80)
+            default_icon.fill(Qt.GlobalColor.darkGray)
+            self.thumb.setPixmap(default_icon)
+
+        # Добавляем название приложения под иконкой
+        self.title_label = QLabel(title)
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.title_label.setStyleSheet("color: white; font-size: 14px; margin-top: 5px;")
+        self.title_label.setMaximumWidth(120)
+        self.title_label.setWordWrap(True)
+
+        lay.addWidget(self.thumb)
+        lay.addWidget(self.title_label)
+
+        self._apply_selected_style()
+
+    def set_selected(self, sel: bool):
+        if self.property("sel") == sel: return
+        self.setProperty("sel", sel)
+        self._apply_selected_style()
+
+    def _apply_selected_style(self):
+        if self.property("sel"):
+            self.setStyleSheet("""
+                QWidget { 
+                    border: 3px solid #4bcfff; 
+                    border-radius: 14px; 
+                    background: rgba(40, 40, 40, 0.9); 
+                }
+            """)
+        else:
+            self.setStyleSheet("""
+                QWidget { 
+                    border: 2px solid rgba(255,255,255,0.15); 
+                    border-radius: 12px; 
+                    background: rgba(30, 30, 30, 0.8); 
+                }
+            """)
+
+
+class TaskSwitcher(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # Изменено для получения фокуса
+        
+        # Таймер для авто-закрытия при бездействии
+        self.auto_close_timer = QTimer(self)
+        self.auto_close_timer.setSingleShot(True)
+        self.auto_close_timer.timeout.connect(self.cancel)
+        self.auto_close_timeout = 5000  # 5 секунд
+
+        self._items: list[tuple[str, QWidget]] = []  # [(name, win)]
+        self._cards: list[_SwitchCard] = []
+        self._index = 0
+
+        # центрированный контейнер
+        root = QVBoxLayout(self); root.setContentsMargins(0,0,0,0); root.setSpacing(0)
+        self.container = QWidget()
+        self.container.setObjectName("switcher_container")
+        self.container.setStyleSheet("""
+            #switcher_container { 
+                background: rgba(20, 20, 20, 0.95); 
+                border-radius: 20px; 
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+        """)
+        cLay = QVBoxLayout(self.container); cLay.setContentsMargins(40,40,40,40); cLay.setSpacing(16)
+
+        self.row = QHBoxLayout(); self.row.setSpacing(18)
+        self.row.setContentsMargins(0,0,0,0)
+
+        scroll_host = QFrame()
+        sh_lay = QHBoxLayout(scroll_host); sh_lay.setContentsMargins(0,0,0,0)
+        self.row_widget = QWidget()
+        self.row_widget.setLayout(self.row)
+        sh_lay.addWidget(self.row_widget)
+
+        scroll = QScrollArea()
+        scroll.setWidget(scroll_host); scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setStyleSheet("""
+            QScrollArea { 
+                background: transparent; 
+                border: none; 
+            }
+            QScrollArea > QWidget > QWidget {
+                background: transparent;
+            }
+        """)
+
+        cLay.addWidget(scroll)
+        root.addWidget(self.container)
+
+        # Устанавливаем фильтр событий для родителя
+        if parent:
+            parent.installEventFilter(self)
+
+    def _get_app_icon(self, app_name: str) -> QPixmap:
+        """Получает иконку приложения по его имени"""
+        # Пути к иконке приложения (пробуем несколько вариантов)
+        possible_icon_paths = [
+            os.path.join("apps", "local", app_name, f"{app_name}.png"),
+            os.path.join("apps", "local", app_name, "icon.png"),
+            os.path.join("apps", "local", f"{app_name}.png"),
+            os.path.join("bin", "icons", "local_icons", "inons_apps", app_name, "icon.png"),
+            os.path.join("bin", "icons", "local_icons", "system", "default_app.png")  # Иконка по умолчанию
+        ]
+        
+        for path in possible_icon_paths:
+            if os.path.exists(path):
+                return QPixmap(path)
+        
+        # Если иконка не найдена, создаем простую иконку с буквой
+        default_icon = QPixmap(100, 100)
+        default_icon.fill(Qt.GlobalColor.darkGray)
+        return default_icon
+
+    def open_with(self, items: list[tuple[str, QWidget]], initial_name: str | None):
+        self._items = items
+        for i in reversed(range(self.row.count())):
+            w = self.row.itemAt(i).widget()
+            if w: 
+                w.setParent(None)
+        self._cards.clear()
+
+        for name, win in self._items:
+            # Вместо скриншота окна используем иконку приложения
+            icon = self._get_app_icon(name)
+            card = _SwitchCard(name.capitalize(), icon, False, self)  # Добавляем название
+            self.row.addWidget(card)
+            self._cards.append(card)
+
+        self._index = 0
+        if initial_name:
+            for i, (nm, _) in enumerate(self._items):
+                if nm == initial_name:
+                    self._index = i
+                    break
+        self._sync_selection()
+
+        # Рассчитать размер окна под карточки (теперь они меньше)
+        card_width = 140  # Уменьшаем ширину карточки
+        card_spacing = self.row.spacing()
+        margin = 40  # padding контейнера
+        total_width = len(self._cards) * card_width + (len(self._cards)-1) * card_spacing + 2*margin
+        total_height = 160 + 2*margin + 20  # Уменьшаем высоту
+
+        # Установить размер и центрировать на родителе
+        if self.parent():
+            parent_rect = self.parent().geometry()
+            x = parent_rect.x() + (parent_rect.width() - total_width) // 2
+            y = parent_rect.y() + (parent_rect.height() - total_height) // 2
+            self.setGeometry(x, y, total_width, total_height)
+        else:
+            self.resize(total_width, total_height)
+
+        self.show()
+        self.raise_()
+        self.setFocus()  # Захватываем фокус
+        self.auto_close_timer.start(self.auto_close_timeout)  # Запускаем таймер авто-закрытия
+
+    def next(self):
+        if not self._cards: 
+            return
+        self._index = (self._index + 1) % len(self._cards)
+        self._sync_selection()
+        self.auto_close_timer.start(self.auto_close_timeout)  # Сбрасываем таймер при действии
+
+    def prev(self):
+        if not self._cards: 
+            return
+        self._index = (self._index - 1 + len(self._cards)) % len(self._cards)
+        self._sync_selection()
+        self.auto_close_timer.start(self.auto_close_timeout)  # Сбрасываем таймер при действии
+
+    def _sync_selection(self):
+        for i, card in enumerate(self._cards):
+            card.set_selected(i == self._index)
+
+    def finalize(self) -> str | None:
+        self.auto_close_timer.stop()
+        if not self._items: 
+            self.hide()
+            return None
+        chosen = self._items[self._index][0]
+        self.hide()
+        if self.parent():
+            self.parent()._switcher_active = False
+        return chosen
+
+    def cancel(self):
+        self.auto_close_timer.stop()
+        self.hide()
+        if self.parent():
+            self.parent()._switcher_active = False
+
+    def mousePressEvent(self, event):
+        """Закрывать при клике вне карточек"""
+        if event.button() == Qt.MouseButton.LeftButton or event.button() == Qt.MouseButton.RightButton:
+            self.cancel()
+        super().mousePressEvent(event)
+
+    def keyPressEvent(self, event):
+        """Обработка клавиш"""
+        if event.key() == Qt.Key.Key_Escape:
+            self.cancel()
+        elif event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
+            self.finalize()
+        elif event.key() == Qt.Key.Key_Tab:
+            if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                self.prev()
+            else:
+                self.next()
+        elif event.key() == Qt.Key.Key_Left:
+            self.prev()
+        elif event.key() == Qt.Key.Key_Right:
+            self.next()
+        else:
+            super().keyPressEvent(event)
+        
+        # Сбрасываем таймер при любом нажатии клавиши
+        self.auto_close_timer.start(self.auto_close_timeout)
+
+    def eventFilter(self, obj, event):
+        """Фильтр событий для родительского окна"""
+        if event.type() == QEvent.Type.MouseButtonPress:
+            # Если клик вне switcher'а - закрываем
+            if not self.geometry().contains(event.globalPosition().toPoint()):
+                self.cancel()
+                return True
+        return super().eventFilter(obj, event)
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        left   = int(self.width() * 0.05)
+        top    = int(self.height() * 0.25)
+        right  = int(self.width() * 0.05)
+        bottom = int(self.height() * 0.35)
+        self.container.setGeometry(self.rect().marginsRemoved(QMargins(left, top, right, bottom)))
+
+    def hideEvent(self, event):
+        """При скрытии останавливаем таймер"""
+        self.auto_close_timer.stop()
+        super().hideEvent(event)
 
 
 class MacOSWindow(QMainWindow):
@@ -122,12 +396,40 @@ class MacOSWindow(QMainWindow):
             self.create_all_windows()
             # self.check_for_updates()
 
+            # Alt+Tab switcher
+            self._switcher_active = False
+            self.task_switcher = TaskSwitcher(self)
+            self.task_switcher.hide()
+
             
             # Создаем экран блокировки
             self.create_lock_screen()
         except Exception as e:
             # Если ошибка происходит в конструкторе, показываем её в DeathScreen
             self.show_death_screen(f"Critical error in constructor: {str(e)}")
+
+    def _task_items(self) -> list[tuple[str, QWidget]]:
+        items = []
+        # видимые/свернутые окна: берём те, что существуют
+        for name, win in self.open_windows.items():
+            if win is not None:  # показываем все, даже если свернуты
+                items.append((name, win))
+        # активное окно ставим первым
+        if hasattr(self, "active_window_name") and self.active_window_name:
+            items.sort(key=lambda t: 0 if t[0] == self.active_window_name else 1)
+        return items
+
+    def _open_switcher(self, reverse: bool = False):
+        items = self._task_items()
+        if not items:
+            return
+        initial = getattr(self, "active_window_name", None)
+        self.task_switcher.open_with(items, initial)
+        self._switcher_active = True
+        if reverse:
+            self.task_switcher.prev()
+        else:
+            self.task_switcher.next()
 
     def load_translations(self, language_code):
         """Завантажує файл перекладу за кодом мови."""
@@ -177,7 +479,11 @@ class MacOSWindow(QMainWindow):
         layout.addWidget(self.volume_button)
         
         # Создаем виджет управления громкостью (изначально скрыт)
-        self.volume_widget = VolumeControlWidget()
+        self.volume_widget = VolumeControlWidget(
+            parent=self,
+            translator=self.tr,  # Передаем функцию перевода из MacOSWindow
+            lang_code=self.current_language  # Передаем текущий язык
+        )
         self.volume_widget.setParent(self)
 
         self.volume_widget.hide()
@@ -305,7 +611,11 @@ class MacOSWindow(QMainWindow):
         layout.addWidget(self.time_button)
         
         # Создаем виджет календаря (изначально скрыт)
-        self.calendar_widget = CalendarWidget()
+        self.calendar_widget = CalendarWidget(
+            parent=self,
+            translator=self.tr,  # Передаем функцию перевода из MacOSWindow
+            lang_code=self.current_language  # Передаем текущий язык
+        )
         self.calendar_widget.setParent(self)
         self.calendar_widget.setFixedSize(350, 350)
         self.calendar_widget.move(
@@ -705,19 +1015,68 @@ class MacOSWindow(QMainWindow):
         self.switch_window(next_window_name)
         self.active_window_name = next_window_name
 
+    # def create_all_windows(self):
+    #     """
+    #     Инициализация окон. Окна создаются только при первом открытии.
+    #     """
+    #     self.open_windows = {
+    #         "browser": None,
+    #         "cmd": None,
+    #         "settings": None,
+    #         "calc": None,
+    #         "explorer": None,
+    #         "notebook": None,
+    #         "Vscode": None,
+    #         "app_store": None
+    #     }
+
     def create_all_windows(self):
         """
         Инициализация окон. Окна создаются только при первом открытии.
         """
-        self.open_windows = {
-            "browser": None,
-            "cmd": None,
-            "settings": None,
-            "calc": None,
-            "explorer": None,
-            "notebook": None,
-            "app_store": None
-        }
+        config_path = r"root\bin\list_apps\list_apps.config"
+        
+        try:
+            with open(config_path, 'r', encoding='utf-8') as file:
+                content = file.read().strip()
+                # Преобразуем JSON строку в словарь Python
+                self.open_windows = json.loads(content)
+                
+        except FileNotFoundError:
+            print(f"Файл конфигурации {config_path} не найден. Используются значения по умолчанию.")
+            # Значения по умолчанию на случай отсутствия файла
+            self.open_windows = {
+                "browser": None,
+                "cmd": None,
+                "settings": None,
+                "calc": None,
+                "explorer": None,
+                "notebook": None,
+                "app_store": None
+            }
+        except json.JSONDecodeError as e:
+            print(f"Ошибка парсинга JSON в файле {config_path}: {e}")
+            # Значения по умолчанию на случай ошибки парсинга
+            self.open_windows = {
+                "browser": None,
+                "cmd": None,
+                "settings": None,
+                "calc": None,
+                "explorer": None,
+                "notebook": None,
+                "app_store": None
+            }
+        except Exception as e:
+            print(f"Неожиданная ошибка при загрузке конфигурации: {e}")
+            self.open_windows = {
+                "browser": None,
+                "cmd": None,
+                "settings": None,
+                "calc": None,
+                "explorer": None,
+                "notebook": None,
+                "app_store": None
+            }
 
 
     def create_menu(self):
@@ -809,8 +1168,37 @@ class MacOSWindow(QMainWindow):
         # Enter (оставляем без изменений)
         elif event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
             self.unlock_screen()
+
+
+        # ALT+TAB — открыть/листать; ALT+SHIFT+TAB — назад
+        elif event.key() == Qt.Key.Key_Control and (event.modifiers() & Qt.KeyboardModifier.AltModifier):
+            if not self._switcher_active:
+                self._open_switcher(reverse=bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier))
+            else:
+                if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                    self.task_switcher.prev()
+                else:
+                    self.task_switcher.next()
+            return  # не пробрасываем дальше
+
+        # ESC — отменить выбор, если открыт переключатель
+        elif self._switcher_active and event.key() == Qt.Key.Key_Escape:
+            self.task_switcher.cancel()
+            self._switcher_active = False
+            return
         
         super().keyPressEvent(event)
+
+    def keyReleaseEvent(self, event):
+        # отпускание ALT — применить выбор
+        if self._switcher_active and event.key() == Qt.Key.Key_Alt:
+            chosen = self.task_switcher.finalize()
+            self._switcher_active = False
+            if chosen:
+                self.switch_window(chosen)  # уже есть у тебя
+            return
+        super().keyReleaseEvent(event)
+
 
     def _switch_keyboard_layout(self):
         """Переключает между предопределёнными раскладками"""
@@ -893,7 +1281,7 @@ class MacOSWindow(QMainWindow):
         left_layout.setSpacing(10)
 
         # Пошук
-        self.search_box = QLineEdit()  # Сохраняем как атрибут класса
+        self.search_box = Input()  # Сохраняем как атрибут класса
         self.search_box.setPlaceholderText("Пошук...")
         self.search_box.setStyleSheet("""
             QLineEdit {
@@ -1082,7 +1470,7 @@ class MacOSWindow(QMainWindow):
     
     def create_window_switch_menu(self):
         """Создает меню для переключения между открытыми окнами."""
-        self.window_switch_menu = QMenu(self)
+        self.window_switch_menu = Menu(self)
         
         # Получаем список открытых окон
         open_windows = [name for name, win in self.open_windows.items() if win and not win.isHidden()]
@@ -1226,7 +1614,11 @@ class MacOSWindow(QMainWindow):
         layout.addWidget(self.wifi_button)
         
         # Создаем виджет Wi-Fi (изначально скрыт)
-        self.wifi_window = WifiWindow()
+        self.wifi_window = WifiWindow(
+            parent=self,
+            translator=self.tr,  # Передаем функцию перевода из MacOSWindow
+            lang_code=self.current_language  # Передаем текущий язык
+        )
         self.wifi_window.setParent(self)
         self.wifi_window.setObjectName("wifi_window")
         self.wifi_window.hide()

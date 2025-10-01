@@ -35,10 +35,12 @@ class WifiPasswordManager:
 
 
 class WifiWindow(QWidget):
-    def __init__(self):
+    def __init__(self, parent=None, translator=None, lang_code="en"):
         super().__init__()
+        self.tr = translator if translator else lambda x: x
+        self.lang_code = lang_code  # Сохраняем переданный язык
         self.password_manager = WifiPasswordManager()
-        self.setWindowTitle("Wi-Fi")
+        self.setWindowTitle(self.tr("Wi-Fi"))
         self.setFixedSize(350, 450)
         self.setStyleSheet("""
             QWidget {
@@ -74,21 +76,21 @@ class WifiWindow(QWidget):
 
         layout = QVBoxLayout()
 
-        self.current_network_label = QLabel("Текущая сеть: (не подключено)")
+        self.current_network_label = QLabel(self.tr("Current network: (not connected)"))
         layout.addWidget(self.current_network_label)
 
         # Создаем горизонтальный layout для переключателя и кнопки обновления
         toggle_layout = QHBoxLayout()
         
         # Добавляем метку "Wi-Fi"
-        toggle_label = QLabel("Wi-Fi")
+        toggle_label = QLabel(self.tr("Wi-Fi"))
         toggle_layout.addWidget(toggle_label)
         
         # Добавляем растягивающийся элемент, чтобы прижать элементы к краям
         toggle_layout.addStretch()
         
         # Добавляем кнопку обновления
-        refresh_btn = QPushButton("Обновить сети")
+        refresh_btn = QPushButton(self.tr("Refresh networks"))
         refresh_btn.clicked.connect(self.scan_networks)
         toggle_layout.addWidget(refresh_btn)
         
@@ -135,17 +137,17 @@ class WifiWindow(QWidget):
             self.scan_networks()
         else:
             self.network_list.clear()
-            self.current_network_label.setText("Wi-Fi отключён")
+            self.current_network_label.setText(self.tr("Wi-Fi disabled"))
 
     def update_current_network(self):
         if not self.iface:
-            self.current_network_label.setText("Wi-Fi адаптер не найден")
+            self.current_network_label.setText(self.tr("Wi-Fi adapter not found"))
             return
             
         if self.iface.status() == const.IFACE_CONNECTED:
-            self.current_network_label.setText("Текущая сеть: подключено ✅")
+            self.current_network_label.setText(self.tr("Current network: connected ✅"))
         else:
-            self.current_network_label.setText("Текущая сеть: (не подключено)")
+            self.current_network_label.setText(self.tr("Current network: (not connected)"))
 
     def get_signal_icon(self, signal_percent: int, locked: bool) -> QIcon:
         level = 0
@@ -163,11 +165,11 @@ class WifiWindow(QWidget):
     def scan_networks(self):
         if not self.iface:
             self.network_list.clear()
-            self.network_list.addItem("Wi-Fi адаптер не найден")
+            self.network_list.addItem(self.tr("Wi-Fi adapter not found"))
             return
             
         self.network_list.clear()
-        self.network_list.addItem("Сканирование...")
+        self.network_list.addItem(self.tr("Scanning..."))
         
         # Используем QTimer для асинхронного выполнения
         QTimer.singleShot(0, self._perform_scan)
@@ -179,7 +181,7 @@ class WifiWindow(QWidget):
             QTimer.singleShot(3000, self._process_scan_results)
         except Exception as e:
             self.network_list.clear()
-            self.network_list.addItem(f"Ошибка сканирования: {str(e)}")
+            self.network_list.addItem(self.tr("Scan error: {}").format(str(e)))
 
     def _process_scan_results(self):
         if not self.iface:
@@ -199,16 +201,16 @@ class WifiWindow(QWidget):
                     item = QListWidgetItem(icon, f"{network.ssid} ({signal_percent}%)")
                     
                     if self.password_manager.get_password(network.ssid):
-                        item.setToolTip("Пароль сохранён")
+                        item.setToolTip(self.tr("Password saved"))
                     
                     self.network_list.addItem(item)
                     ssids.add(network.ssid)
 
             if not ssids:
-                self.network_list.addItem("Нет доступных сетей")
+                self.network_list.addItem(self.tr("No available networks"))
                 
         except Exception as e:
-            self.network_list.addItem(f"Ошибка обработки результатов: {str(e)}")
+            self.network_list.addItem(self.tr("Error processing results: {}").format(str(e)))
             
         self.update_current_network()
 
@@ -218,48 +220,47 @@ class WifiWindow(QWidget):
 
     def connect_to_selected_network(self, item):
         if not self.iface:
-            QMessageBox.warning(self, "Ошибка", "Wi-Fi адаптер не найден")
+            StellarMessageBox.warning(self, self.tr("Error"), self.tr("Wi-Fi adapter not found"))
             return
             
         ssid = item.text().split(" (")[0]
         saved_password = self.password_manager.get_password(ssid)
         
         if saved_password:
-            reply = QMessageBox.question(
+            reply = StellarMessageBox.question(
                 self, 
-                "Подключение к Wi-Fi", 
-                f"Использовать сохранённый пароль для '{ssid}'?",
+                self.tr("Connect to Wi-Fi"), 
+                self.tr("Use saved password for '{}'?").format(ssid),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.Yes
             )
-            
+
             if reply == QMessageBox.StandardButton.Yes:
                 password = saved_password
             else:
-                password, ok = QInputDialog.getText(
+                password, ok = CustomInputDialog.getText(
                     self, 
-                    "Подключение к Wi-Fi", 
-                    f"Введите пароль для '{ssid}':", 
-                    QLineEdit.EchoMode.Password,
-                    ""
+                    self.tr("Connect to Wi-Fi"), 
+                    self.tr("Enter password for '{}':").format(ssid),
+                    ""  # Передаём начальный текст (пустую строку)
                 )
                 if not ok:
                     return
         else:
-            password, ok = QInputDialog.getText(
+            password, ok = CustomInputDialog.getText(
                 self, 
-                "Подключение к Wi-Fi", 
-                f"Введите пароль для '{ssid}':", 
-                QLineEdit.EchoMode.Password,
-                ""
+                self.tr("Connect to Wi-Fi"), 
+                self.tr("Enter password for '{}':").format(ssid),
+                ""  # Передаём начальный текст (пустую строку)
             )
             if not ok:
                 return
+
         
         self.password_manager.save_password(ssid, password)
         
         # Показываем сообщение о подключении
-        self.network_list.addItem(f"Подключение к {ssid}...")
+        self.network_list.addItem(self.tr("Connecting to {}...").format(ssid))
         
         # Асинхронное подключение
         QTimer.singleShot(0, lambda: self._connect_to_network(ssid, password))
@@ -281,16 +282,16 @@ class WifiWindow(QWidget):
             QTimer.singleShot(5000, self._check_connection_status)
             
         except Exception as e:
-            QMessageBox.warning(self, "Ошибка", f"Ошибка подключения: {str(e)}")
+            StellarMessageBox.warning(self, self.tr("Error"), self.tr("Connection error: {}").format(str(e)))
 
     def _check_connection_status(self):
         if not self.iface:
             return
             
         if self.iface.status() == const.IFACE_CONNECTED:
-            QMessageBox.information(self, "Успех", f"Подключено к '{self.iface.scan_results()[0].ssid}'")
+            StellarMessageBox.information(self, self.tr("Success"), self.tr("Connected to '{}'").format(self.iface.scan_results()[0].ssid))
         else:
-            QMessageBox.warning(self, "Ошибка", "Не удалось подключиться")
+            StellarMessageBox.warning(self, self.tr("Error"), self.tr("Failed to connect"))
             
         self.update_current_network()
 
@@ -299,8 +300,8 @@ class WifiWindow(QWidget):
             return
             
         if self.iface.status() == const.IFACE_CONNECTED:
-            QMessageBox.information(self, "Успех", f"Подключено к '{self.iface.scan_results()[0].ssid}'")
+            StellarMessageBox.information(self, self.tr("Success"), self.tr("Connected to '{}'").format(self.iface.scan_results()[0].ssid))
         else:
-            QMessageBox.warning(self, "Ошибка", "Не удалось подключиться")
+            StellarMessageBox.warning(self, self.tr("Error"), self.tr("Failed to connect"))
             
         self.update_current_network()

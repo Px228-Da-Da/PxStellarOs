@@ -53,5 +53,18 @@
   "Select Backup": "Select Backup",
   "Error creating backup": "Error Creating Backup",
   "Failed to create backup": "Failed to create backup",
-  "No backups created.": "No backups created."
+  "No backups created.": "No backups created.",
+
+  
+  "Enter path...": "Enter path...",
+  "Search...": "Search...",
+  "File Explorer": "File Explorer",
+  "New File": "New File",
+  "New Folder": "New Folder",
+  "Delete": "Delete",
+  "Rename": "Rename",
+  "Open in Notebook": "Open in Notebook",
+  "Copy": "Copy",
+  "Cut": "Cut",
+  "Paste": "Paste"
 }

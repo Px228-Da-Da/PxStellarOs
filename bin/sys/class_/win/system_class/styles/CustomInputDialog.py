@@ -13,13 +13,21 @@ class CustomInputDialog(QDialog):
     def __init__(self, parent=None, title="", label="", text=""):
         super().__init__(parent)
         self.setWindowTitle(title)
+        self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setStyleSheet("""
             QDialog {
+                background-color: transparent;
+            }
+            QWidget#background {
                 background-color: #2d2d2d;
+                border: 2px solid #0078d7;
+                border-radius: 12px;
             }
             QLabel {
                 font-size: 14px;
                 color: white;
+                background-color: transparent;
             }
             QLineEdit {
                 background-color: #3d3d3d;
@@ -42,9 +50,22 @@ class CustomInputDialog(QDialog):
             QPushButton:disabled {
                 background-color: #555;
             }
+            QDialogButtonBox {
+                background-color: transparent;
+            }
         """)
         
-        layout = QVBoxLayout(self)
+        # Создаем фоновый виджет для закругленных углов
+        self.background_widget = QWidget(self)
+        self.background_widget.setObjectName("background")
+        
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addWidget(self.background_widget)
+        
+        # Основной layout внутри фонового виджета
+        layout = QVBoxLayout(self.background_widget)
+        layout.setContentsMargins(20, 20, 20, 20)
         
         self.label = QLabel(label)
         layout.addWidget(self.label)
@@ -59,6 +80,9 @@ class CustomInputDialog(QDialog):
         
         self.line_edit.textChanged.connect(self.validate_input)
         self.validate_input(text)
+        
+        # Устанавливаем фиксированный размер для диалога
+        self.setFixedSize(400, 160)
     
     def validate_input(self, text):
         button = self.findChild(QDialogButtonBox).button(QDialogButtonBox.StandardButton.Ok)

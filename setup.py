@@ -3,7 +3,7 @@ import os
 import shutil
 # импорт наверху рядом с остальными:
 from PyQt6.QtCore import QMargins
-
+import threading
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin")))
 from dependencies import *
 
@@ -1079,6 +1079,58 @@ class MacOSWindow(QMainWindow):
             }
 
 
+    # def create_menu(self):
+    #     """
+    #     Создает меню с использованием QMenuBar и добавляет время/дату в правый угол.
+    #     """
+    #     menubar = self.menuBar()
+    #     menubar.setObjectName("main_menu_bar")
+
+    #     # Меню "Win" (динамически изменяет название на активное окно)
+    #     self.win_menu = menubar.addMenu("Win")
+    #     self.update_win_menu("desktop")
+
+    #     # Меню "Power" (Выключение и перезагрузка)
+    #     power_menu = menubar.addMenu(self.tr("Power"))
+
+    #     # Действие для выключения
+    #     shutdown_action = QAction(self.tr("Shutdown"), self)
+    #     shutdown_action.triggered.connect(self.shutdown_system)
+    #     power_menu.addAction(shutdown_action)
+
+    #     # Действие для перезагрузки
+    #     reboot_action = QAction(self.tr("Reboot"), self)
+    #     reboot_action.triggered.connect(self.reboot_system)
+    #     power_menu.addAction(reboot_action)
+
+    #     # Действие для блокировки экрана
+    #     lock_action = QAction(self.tr("Lock"), self)  # Кнопка блокировки
+    #     lock_action.triggered.connect(self.lock_screen)  # Связываем с методом блокировки
+    #     power_menu.addAction(lock_action)  # Добавляем в меню "Power"
+        
+    #     # Добавляем разделитель
+    #     power_menu.addSeparator()
+        
+    #     # Действие для закрытия приложения
+    #     quit_action = QAction(self.tr("Quit"), self)
+    #     # quit_action.setShortcut("Ctrl+Q")  # Горячая клавиша
+    #     quit_action.triggered.connect(self.close)  # Закрываем главное окно
+    #     power_menu.addAction(quit_action)
+
+    #     # Создание метки для времени и даты
+    #     self.time_label = QLabel()
+    #     self.time_label.setFont(QFont("Helvetica", 14))
+    #     self.time_label.setStyleSheet("color: black; padding: 5px;")
+    #     # self.update_time()  # Обновляем сразу при старте
+    #     self.create_wifi_button()
+
+    #     # Создание таймера для обновления времени
+    #     self.timer = QTimer(self)
+    #     self.timer.timeout.connect(self.update_time)
+    #     self.timer.start(1000)  # Обновление каждую секунду
+
+    #     # Добавление времени в правый угол меню
+    #     menubar.setCornerWidget(self.time_label, Qt.Corner.TopRightCorner)
     def create_menu(self):
         """
         Создает меню с использованием QMenuBar и добавляет время/дату в правый угол.
@@ -1117,6 +1169,29 @@ class MacOSWindow(QMainWindow):
         quit_action.triggered.connect(self.close)  # Закрываем главное окно
         power_menu.addAction(quit_action)
 
+        # Меню "Language" для переключения раскладки клавиатуры
+        language_menu = menubar.addMenu(self.tr("Language"))
+        
+        # Действие для переключения следующего языка
+        switch_lang_action = QAction(self.tr("Next Language (Alt+Shift)"), self)
+        switch_lang_action.triggered.connect(self.switch_language)
+        language_menu.addAction(switch_lang_action)
+        
+        # Добавляем разделитель
+        language_menu.addSeparator()
+        
+        # Добавляем действия для выбора конкретного языка
+        self.languages = [
+            {"name": "English", "layout": "us", "flag": "🇺🇸"},
+            {"name": "Russian", "layout": "ru", "flag": "🇷🇺"},
+            {"name": "Ukrainian", "layout": "ua", "flag": "🇺🇦"}
+        ]
+        
+        for i, lang in enumerate(self.languages):
+            lang_action = QAction(f"{lang['flag']} {lang['name']}", self)
+            lang_action.triggered.connect(lambda checked, idx=i: self.set_language(idx))
+            language_menu.addAction(lang_action)
+
         # Создание метки для времени и даты
         self.time_label = QLabel()
         self.time_label.setFont(QFont("Helvetica", 14))
@@ -1131,6 +1206,68 @@ class MacOSWindow(QMainWindow):
 
         # Добавление времени в правый угол меню
         menubar.setCornerWidget(self.time_label, Qt.Corner.TopRightCorner)
+
+        # Инициализация отображения текущего языка
+        self.update_language_display()
+
+    def switch_language(self):
+        """Переключает на следующий язык в списке"""
+        thread = threading.Thread(target=self._switch_language_thread)
+        thread.daemon = True
+        thread.start()
+
+    def _switch_language_thread(self):
+        """Поток для переключения языка"""
+        current_layout = self.get_current_layout()
+        current_index = 0
+        
+        for i, lang in enumerate(self.languages):
+            if lang['layout'] == current_layout:
+                current_index = i
+                break
+        
+        next_index = (current_index + 1) % len(self.languages)
+        self.set_language(next_index)
+
+    def set_language(self, index):
+        """Устанавливает конкретный язык по индексу"""
+        lang = self.languages[index]
+        try:
+            subprocess.run(['setxkbmap', '-layout', lang['layout']])
+            subprocess.run([
+                'notify-send', '-t', '1000',
+                self.tr('Keyboard Language'),
+                f"{lang['flag']} {lang['name']}"
+            ])
+            self.update_language_display()
+        except Exception as e:
+            print(f"Error: {e}")
+
+    def get_current_layout(self):
+        """Получает текущую раскладку клавиатуры"""
+        try:
+            result = subprocess.run(
+                ['setxkbmap', '-query'], 
+                capture_output=True, 
+                text=True
+            )
+            for line in result.stdout.split('\n'):
+                if line.startswith('layout:'):
+                    return line.split(':')[1].strip()
+        except:
+            pass
+        return "us"
+
+    def update_language_display(self):
+        """Обновляет отображение текущего языка (можно добавить в time_label или отдельный виджет)"""
+        current_layout = self.get_current_layout()
+        for lang in self.languages:
+            if lang['layout'] == current_layout:
+                # Можно обновлять статус в time_label или создать отдельный виджет
+                # Например, добавить иконку текущего языка рядом со временем
+                current_lang_text = f"{lang['flag']} {lang['name']}"
+                # self.time_label.setText(f"{current_lang_text} | {self.get_current_time()}")
+                break
     
     def keyPressEvent(self, event: QKeyEvent):
         """Обробляє натискання клавіш у глобальному контексті"""
@@ -1241,6 +1378,15 @@ class MacOSWindow(QMainWindow):
                 ctypes.windll.user32.ActivateKeyboardLayout(target_layout, 0)
         except Exception as e:
             print(f"Windows layout switch error: {e}")
+
+    def _get_language_name(self, lang_id):
+        """Получает название языка по ID"""
+        language_names = {
+            0x409: "EN",  # English
+            0x419: "RU",  # Russian
+            0x422: "UA",  # Ukrainian
+        }
+        return language_names.get(lang_id, "EN")
 
     def _show_layout_notification(self, text):
         """Показывает уведомление о текущей раскладке"""

@@ -17,6 +17,7 @@ class NotebookWindow(DraggableResizableWindow):
         super().__init__(parent)
         self.parent_window = parent
         self.window_name = window_name
+        self.tr = translator if translator else lambda x: x
         self.lang_code = lang_code
         self.current_file = None  # Добавляем инициализацию current_file
         
@@ -54,7 +55,11 @@ class NotebookWindow(DraggableResizableWindow):
         main_layout.addWidget(separator)
 
         # Заменяем QTextEdit на кастомный
-        self.text_edit = CustomTextEdit()
+        self.text_edit = CustomTextEdit(
+            parent=self,
+            translator=self.tr,
+            lang_code=self.lang_code
+    )
         self.content_layout.addWidget(self.text_edit)
         
         # Настройка скроллбаров (ваш существующий код)

@@ -99,13 +99,21 @@ class ExplorerWindow(DraggableResizableWindow):
         toolbar.addLayout(nav_buttons)
 
         # Path field
-        self.path_edit = Input()
+        self.path_edit = Input(
+            parent=self,
+            translator=self.tr,
+            lang_code=self.lang_code
+        )
         self.path_edit.setPlaceholderText(self.tr("Enter path..."))
         self.path_edit.returnPressed.connect(self.navigate_to_path)
         self.path_edit.setMinimumHeight(32)
         
         # Search field
-        self.search_edit = Input()
+        self.search_edit = Input(
+            parent=self,
+            translator=self.tr,
+            lang_code=self.lang_code
+        )
         self.search_edit.setPlaceholderText(self.tr("Search..."))
         self.search_edit.setMinimumHeight(32)
         self.search_edit.setMaximumWidth(200)
@@ -200,7 +208,11 @@ class ExplorerWindow(DraggableResizableWindow):
         self.file_preview_label.setFixedSize(100, 100)
         
         # File details section
-        self.file_details_text = CustomTextEdit_cmd()
+        self.file_details_text = CustomTextEdit_cmd(
+            parent=self,
+            translator=self.tr,
+            lang_code=self.lang_code
+        )
         self.file_details_text.setReadOnly(True)
         self.file_details_text.setStyleSheet("""
             QTextEdit {

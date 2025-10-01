@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import QScrollBar
 from PyQt6.QtCore import Qt
 
 from CustomContextMenu import CustomContextMenu, ContextMenuMixin, CustomTextEdit, CustomPlainTextEdit, CustomLineEdit, CustomContextMenu_cmd, ContextMenuMixin_cmd, CustomTextEdit_cmd, CustomPlainTextEdit_cmd, CustomLineEdit_cmd
-
+from PyQt6.QtCore import pyqtSignal
 
 
 class CastScrollBar(QScrollBar):
@@ -98,6 +98,8 @@ class CastScrollBar(QScrollBar):
 
 
 class TerminalTab(QWidget, ContextMenuMixin):
+    new_tab_requested = pyqtSignal()  # 🔥 сигнал оголошується тут, на рівні класу
+
     def __init__(self):
         super().__init__()
         self.layout = QVBoxLayout()
@@ -116,7 +118,6 @@ class TerminalTab(QWidget, ContextMenuMixin):
         self.output.setVerticalScrollBar(CastScrollBar(Qt.Orientation.Vertical))
         self.output.setHorizontalScrollBar(CastScrollBar(Qt.Orientation.Horizontal))
 
-
         # Поле ввода
         self.input = CustomLineEdit()
         self.input.setStyleSheet("""
@@ -129,25 +130,52 @@ class TerminalTab(QWidget, ContextMenuMixin):
             padding: 5px;
         """)
 
+        # Кнопка "➕" справа от поля ввода
+        self.add_tab_button = QPushButton("➕")
+        self.add_tab_button.setFixedSize(30, 30)
+        self.add_tab_button.setStyleSheet("""
+            QPushButton {
+                background-color: #0078d7;
+                color: white;
+                font-size: 16px;
+                border-radius: 15px;
+            }
+            QPushButton:hover {
+                background-color: #3399ff;
+            }
+            QPushButton:pressed {
+                background-color: #0066cc;
+            }
+        """)
+        self.add_tab_button.clicked.connect(self.new_tab_requested.emit)  # 🔥 теперь работает
+
+        # Горизонтальный layout
+        input_layout = QHBoxLayout()
+        input_layout.setContentsMargins(0, 0, 0, 0)
+        input_layout.setSpacing(5)
+        input_layout.addWidget(self.input)
+        input_layout.addWidget(self.add_tab_button)
+
         self.input.returnPressed.connect(self.execute_command)
 
         self.layout.addWidget(self.output)
-        self.layout.addWidget(self.input)
+        self.layout.addLayout(input_layout)
         self.setLayout(self.layout)
 
-        # Запуск терминала (отдельный процесс для каждой вкладки)
+        # Запуск терминала
         self.process = QProcess()
-        self.process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)  # Объединение stdout и stderr
+        self.process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
         self.process.readyReadStandardOutput.connect(self.read_output)
         self.process.readyReadStandardError.connect(self.read_output)
         if platform.system() == "Windows":
             self.process.start("cmd", ["/K"])
         else:
-            # Linux / MacOS (sh — найсумісніший, або bash якщо є)
             if os.path.exists("/bin/bash"):
                 self.process.start("/bin/bash")
             else:
                 self.process.start("/bin/sh")
+
+
   # Оставляем процесс открытым
 
     def execute_command(self):
@@ -178,23 +206,6 @@ class TerminalApp(QMainWindow):
 
         # Главный вертикальный layout
         self.main_layout = QVBoxLayout(self.central_widget)
-
-        # Верхняя панель с кнопкой
-        self.top_bar = QHBoxLayout()
-        self.main_layout.addLayout(self.top_bar)
-
-        # Кнопка "Создать вкладку"
-        self.add_tab_button = QPushButton("➕")
-        self.add_tab_button.setStyleSheet("""
-            background-color: #0078d7;
-            color: white;
-            font-size: 16px;
-            border-radius: 10px;
-            padding: 5px;
-            margin: 3px;
-        """)
-        self.add_tab_button.clicked.connect(self.add_new_tab)
-        self.top_bar.addWidget(self.add_tab_button)
 
         # Вкладки терминала
         self.tabs = QTabWidget()
@@ -228,8 +239,10 @@ class TerminalApp(QMainWindow):
     def add_new_tab(self):
         """Добавляет новую вкладку с терминалом"""
         new_tab = TerminalTab()
-        index = self.tabs.addTab(new_tab, f"Tab {self.tabs.count() + 1}")
-        self.tabs.setCurrentIndex(index)  # Переключаемся на новую вкладку
+        new_tab.new_tab_requested.connect(self.add_new_tab)  # подписка на сигнал 🔥
+        index = self.tabs.addTab(new_tab, f"cmd {self.tabs.count() + 1}")
+        self.tabs.setCurrentIndex(index)
+
 
     def close_tab(self, index):
         """Закрывает вкладку"""

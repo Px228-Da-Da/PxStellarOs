@@ -389,6 +389,7 @@ class MacOSWindow(QMainWindow):
             self.create_time_button()
             # Создаем кнопку громкости
             self.create_volume_button()
+            self.create_start_button()
             
             # Остальные элементы
             self.create_menu()
@@ -448,6 +449,48 @@ class MacOSWindow(QMainWindow):
     def tr(self, key):
         """Повертає перекладений текст або ключ, якщо не знайдено."""
         return self.translations.get(key, key)
+
+    def create_start_button(self):
+        """Создает кнопку меню Пуск в правом нижнем углу"""
+        # Создаем контейнер для кнопки
+        self.start_button_container = QWidget(self)
+        self.start_button_container.setFixedSize(60, 60)
+        self.start_button_container.move(
+            10,  # Позиция слева от кнопки времени
+            self.height() - 65   # Такая же высота как у кнопки времени
+        )
+        
+        # Вертикальный лэйаут для кнопки
+        layout = QVBoxLayout(self.start_button_container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        # Создаем кнопку
+        self.start_button = QPushButton()
+        self.start_button.setFixedSize(60, 60)
+        self.start_button.setObjectName("start_button")
+        self.start_button.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0.25);
+                border-radius: 16px;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                padding: 0;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.35);
+            }
+        """)
+        
+        # Иконка меню Пуск
+        self.start_icon = QLabel(self.start_button)
+        self.start_icon.setPixmap(QIcon(os.path.join("bin", "icons", "local_icons", "start.png")).pixmap(60, 60))
+        self.start_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.start_icon.setGeometry(15, 15, 30, 30)
+        
+        layout.addWidget(self.start_button)
+        
+        # Подключаем клик по кнопке меню Пуск
+        self.start_button.clicked.connect(self.toggle_start_menu)
 
     def create_volume_button(self):
         """Создает кнопку громкости в правом нижнем углу"""
@@ -774,7 +817,9 @@ class MacOSWindow(QMainWindow):
             parent=self.lock_widget,
             placeholder_text=self.tr("Password"),
             initial_text="",  # Можно указать заранее введённый текст, если нужно
-            echo_mode=QLineEdit.EchoMode.Password  # Или QLineEdit.EchoMode.Normal для обычного текста
+            echo_mode=QLineEdit.EchoMode.Password,  # Или QLineEdit.EchoMode.Normal для обычного текста
+            translator=self.tr,  # Передаем функцию перевода из MacOSWindow
+            lang_code=self.current_language  # Передаем текущий язык
         )
         self.password_input.setGeometry(
             (self.width() - 200) // 2,
@@ -1170,15 +1215,17 @@ class MacOSWindow(QMainWindow):
         power_menu.addAction(quit_action)
 
         # Меню "Language" для переключения раскладки клавиатуры
-        language_menu = menubar.addMenu(self.tr("Language"))
+        # language_menu = menubar.addMenu(self.tr("Language"))
+        self.language_menu = menubar.addMenu(self.tr("Language"))
+
         
         # Действие для переключения следующего языка
         switch_lang_action = QAction(self.tr("Next Language (Alt+Shift)"), self)
         switch_lang_action.triggered.connect(self.switch_language)
-        language_menu.addAction(switch_lang_action)
+        self.language_menu.addAction(switch_lang_action)
         
         # Добавляем разделитель
-        language_menu.addSeparator()
+        self.language_menu.addSeparator()
         
         # Добавляем действия для выбора конкретного языка
         self.languages = [
@@ -1190,7 +1237,7 @@ class MacOSWindow(QMainWindow):
         for i, lang in enumerate(self.languages):
             lang_action = QAction(f"{lang['flag']} {lang['name']}", self)
             lang_action.triggered.connect(lambda checked, idx=i: self.set_language(idx))
-            language_menu.addAction(lang_action)
+            self.language_menu.addAction(lang_action)
 
         # Создание метки для времени и даты
         self.time_label = QLabel()
@@ -1259,15 +1306,15 @@ class MacOSWindow(QMainWindow):
         return "us"
 
     def update_language_display(self):
-        """Обновляет отображение текущего языка (можно добавить в time_label или отдельный виджет)"""
+        """Обновляет отображение текущего языка в меню Language"""
         current_layout = self.get_current_layout()
         for lang in self.languages:
             if lang['layout'] == current_layout:
-                # Можно обновлять статус в time_label или создать отдельный виджет
-                # Например, добавить иконку текущего языка рядом со временем
                 current_lang_text = f"{lang['flag']} {lang['name']}"
-                # self.time_label.setText(f"{current_lang_text} | {self.get_current_time()}")
+                if hasattr(self, 'language_menu'):
+                    self.language_menu.setTitle(current_lang_text)
                 break
+
     
     def keyPressEvent(self, event: QKeyEvent):
         """Обробляє натискання клавіш у глобальному контексті"""
@@ -1286,19 +1333,35 @@ class MacOSWindow(QMainWindow):
         current_time = QDateTime.currentMSecsSinceEpoch()
         
         # Win key (Meta) - открытие/закрытие меню
-        if event.key() == Qt.Key.Key_Meta:
+        # if event.key() == Qt.Key.Key_Meta:
+        #     self.toggle_start_menu()
+        #     return
+        # Win + L (у вас Win + Y)
+        if event.key() == Qt.Key.Key_L and event.modifiers() & Qt.KeyboardModifier.MetaModifier:
+            self.lock_screen()
+            return  # дуже важливо повернутися, щоб не відкривалося меню
+
+        # Win key — відкриття/закриття меню
+        elif event.key() == Qt.Key.Key_Meta:
             self.toggle_start_menu()
             return
         
-        # Win + L (вместо Ctrl + L)
-        if event.key() == Qt.Key.Key_L and event.modifiers() & Qt.KeyboardModifier.MetaModifier:
-            self.lock_screen()
+        # # Win + L (вместо Ctrl + L)
+        # if event.key() == Qt.Key.Key_Y and event.modifiers() & Qt.KeyboardModifier.MetaModifier:
+        #     self.lock_screen()
         # Alt + Shift (оставляем без изменений)
+        # elif ((event.key() == Qt.Key.Key_Shift and event.modifiers() & Qt.KeyboardModifier.AltModifier) or
+        #      (event.key() == Qt.Key.Key_Alt and event.modifiers() & Qt.KeyboardModifier.ShiftModifier)):
+        #     if current_time - self.last_layout_switch_time > self.layout_switch_delay:
+        #         self._switch_keyboard_layout()
+        #         self.last_layout_switch_time = current_time
         elif ((event.key() == Qt.Key.Key_Shift and event.modifiers() & Qt.KeyboardModifier.AltModifier) or
-             (event.key() == Qt.Key.Key_Alt and event.modifiers() & Qt.KeyboardModifier.ShiftModifier)):
+            (event.key() == Qt.Key.Key_Alt and event.modifiers() & Qt.KeyboardModifier.ShiftModifier)):
             if current_time - self.last_layout_switch_time > self.layout_switch_delay:
-                self._switch_keyboard_layout()
+                self.switch_language()   # <-- использует set_language(...) и notify-send
                 self.last_layout_switch_time = current_time
+
+
         # Win + Tab (вместо Alt + Tab)
         elif event.key() == Qt.Key.Key_Tab and event.modifiers() & Qt.KeyboardModifier.MetaModifier:
             self.switch_to_next_window()
@@ -1338,22 +1401,39 @@ class MacOSWindow(QMainWindow):
 
 
     def _switch_keyboard_layout(self):
-        """Переключает между предопределёнными раскладками"""
+        """Переключает между раскладками (Linux и Windows)."""
         try:
-            # Переключаем индекс раскладки
-            self.current_layout_index = (self.current_layout_index + 1) % len(self.keyboard_layouts)
-            new_layout = self.keyboard_layouts[self.current_layout_index]
-            
-            # Для Windows можно использовать системное переключение
+            # Если у тебя есть self.languages, лучше брать layout'ы оттуда:
+            layout_codes = [lang.get('layout', '').lower() for lang in getattr(self, 'languages', []) if lang.get('layout')]
+            if not layout_codes:
+                # fallback
+                layout_codes = ['us', 'ru']
+
+            # пытаемся узнать текущую раскладку
+            current = self.get_current_layout().lower()
+            try:
+                idx = layout_codes.index(current)
+            except ValueError:
+                idx = 0
+
+            next_idx = (idx + 1) % len(layout_codes)
+            new_layout = layout_codes[next_idx]
+
             if os.name == 'nt':
+                # Для Windows - оставляем существующую логику
                 self._switch_windows_layout(new_layout)
-            
-            # Показываем уведомление
-            self._show_layout_notification(new_layout)
-            
+            else:
+                # Linux / X11
+                subprocess.run(['setxkbmap', '-layout', new_layout])
+
+            # Обновляем отображение и показываем уведомление
+            self.update_language_display()
+            # Покажем набольшую метку (можешь отобразить флаг/имя через mapping)
+            self._show_layout_notification(new_layout.upper())
+
         except Exception as e:
-            # print(f"Ошибка переключения раскладки: {e}")
-            pass
+            print(f"_switch_keyboard_layout error: {e}")
+
 
     def _switch_windows_layout(self, layout):
         """Переключение раскладки в Windows"""
@@ -1427,7 +1507,11 @@ class MacOSWindow(QMainWindow):
         left_layout.setSpacing(10)
 
         # Пошук
-        self.search_box = Input()  # Сохраняем как атрибут класса
+        self.search_box = Input(
+            parent=self,
+            translator=self.tr,  # Передаем функцию перевода из MacOSWindow
+            lang_code=self.current_language  # Передаем текущий язык
+        )
         self.search_box.setPlaceholderText("Пошук...")
         self.search_box.setStyleSheet("""
             QLineEdit {

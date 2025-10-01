@@ -11,11 +11,16 @@ class InputPassword(QLineEdit, ContextMenuMixin):
     def __init__(
         self,
         parent=None,
-        placeholder_text="Password",
+        placeholder_text="",
         initial_text="",
-        echo_mode=QLineEdit.EchoMode.Password
+        echo_mode=QLineEdit.EchoMode.Normal,
+        translator=None,
+        lang_code="en"
     ):
         super().__init__(parent)
+
+        self.tr = translator if translator else lambda x: x
+        self.lang_code = lang_code  # <-- додали
 
         self.setPlaceholderText(placeholder_text)
         self.setText(initial_text)

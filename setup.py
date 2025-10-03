@@ -1371,7 +1371,7 @@ class MacOSWindow(QMainWindow):
 
 
         # ALT+TAB — открыть/листать; ALT+SHIFT+TAB — назад
-        elif event.key() == Qt.Key.Key_Control and (event.modifiers() & Qt.KeyboardModifier.AltModifier):
+        elif event.key() == Qt.Key.Key_Tab and (event.modifiers() & Qt.KeyboardModifier.AltModifier):
             if not self._switcher_active:
                 self._open_switcher(reverse=bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier))
             else:

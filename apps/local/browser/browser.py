@@ -131,17 +131,9 @@ class BrowserWindow(DraggableResizableWindow):
         # self.profile.setPersistentStoragePath(cache_path)
         # Профиль для кеша/куков
         self.profile = QWebEngineProfile("BrowserProfile", self)
-        # cache_path = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.CacheLocation)
-        # self.profile.setCachePath(cache_path)
-        # self.profile.setPersistentStoragePath(cache_path)
-
-        # root\dataLacmi\browser
-        
-        profile_path = os.path.join("root", "dataLacmi", "browser", "profile")
-        os.makedirs(profile_path, exist_ok=True)
-        self.profile.setCachePath(profile_path)
-        self.profile.setPersistentStoragePath(profile_path)
-
+        cache_path = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.CacheLocation)
+        self.profile.setCachePath(cache_path)
+        self.profile.setPersistentStoragePath(cache_path)
 
         # === Автоскачивание файлов ===
         self.download_path = os.path.join("root", "user", "download")

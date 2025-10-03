@@ -1363,8 +1363,8 @@ class MacOSWindow(QMainWindow):
 
 
         # Win + Tab (вместо Alt + Tab)
-        elif event.key() == Qt.Key.Key_Tab and event.modifiers() & Qt.KeyboardModifier.MetaModifier:
-            self.switch_to_next_window()
+        # elif event.key() == Qt.Key.Key_Tab and event.modifiers() & Qt.KeyboardModifier.MetaModifier:
+        #     self.switch_to_next_window()
         # Enter (оставляем без изменений)
         elif event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
             self.unlock_screen()
@@ -2114,7 +2114,7 @@ class MacOSWindow(QMainWindow):
                         window.showNormal()
                         window.activateWindow()
                     else:
-                        self.animate_window_open(window)
+                        # self.animate_window_open(window)
                         window.show()
                         window.raise_()
                         window.activateWindow()
@@ -2311,12 +2311,35 @@ class MacOSWindow(QMainWindow):
 
 
 
+# В начало файла, вместе с другими импортами
+from PyQt6.QtWebEngineWidgets import QWebEngineView
+from PyQt6.QtWebEngineCore import QWebEngineSettings
+from PyQt6.QtCore import QTimer
+
+# В функцию main, перед созданием главного окна
 if __name__ == "__main__":
     # Устанавливаем глобальный обработчик исключений
     sys.excepthook = global_exception_handler
 
     try:
         app = QApplication(sys.argv)
+        
+        # ПРЕДВАРИТЕЛЬНАЯ ИНИЦИАЛИЗАЦИЯ QWebEngineView ДЛЯ УСКОРЕНИЯ ЗАПУСКА
+        # Создаем и сразу скрываем WebEngineView для предзагрузки движка
+        print("Preloading QWebEngineView...")
+        preload_webengine = QWebEngineView()
+        preload_webengine.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, True)
+        preload_webengine.settings().setAttribute(QWebEngineSettings.WebAttribute.PlaybackRequiresUserGesture, False)
+        
+        # Загружаем пустую страницу для инициализации
+        preload_webengine.setHtml("<html><body><p>Loading...</p></body></html>")
+        
+        # Скрываем и удаляем через короткое время
+        QTimer.singleShot(100, preload_webengine.deleteLater)
+        
+        # Обрабатываем события для завершения инициализации
+        QApplication.processEvents()
+        
         window = MacOSWindow()
         window.show()
 
@@ -2329,3 +2352,21 @@ if __name__ == "__main__":
     except Exception as e:
         # Если ошибка произошла до создания окна, показываем её в DeathScreen через временное окно
         global_exception_handler(type(e), e, e.__traceback__)
+# if __name__ == "__main__":
+#     # Устанавливаем глобальный обработчик исключений
+#     sys.excepthook = global_exception_handler
+
+#     try:
+#         app = QApplication(sys.argv)
+#         window = MacOSWindow()
+#         window.show()
+
+#         # Таймер для проверки зависания
+#         timer = QTimer()
+#         timer.timeout.connect(lambda: None)  # Пустая функция для проверки отклика
+#         timer.start(1000)  # Проверка каждую секунду
+
+#         sys.exit(app.exec())
+#     except Exception as e:
+#         # Если ошибка произошла до создания окна, показываем её в DeathScreen через временное окно
+#         global_exception_handler(type(e), e, e.__traceback__)

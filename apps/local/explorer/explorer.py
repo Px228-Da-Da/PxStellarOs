@@ -82,7 +82,7 @@ class ExplorerWindow(DraggableResizableWindow):
         home_icon = QIcon(os.path.join(icons_dir, "home.png"))
         self.home_button.setIcon(home_icon)
         self.home_button.setFixedSize(32, 32)
-        self.home_button.clicked.connect(lambda: self.load_directory(os.path.expanduser(".")))
+        self.home_button.clicked.connect(lambda: self.load_directory(os.path.expanduser("root")))
 
         # Refresh button
         self.refresh_button = QPushButton()
@@ -257,8 +257,19 @@ class ExplorerWindow(DraggableResizableWindow):
         self.load_custom_icons()
 
         # Initialization
-        self.current_path = os.path.expanduser(".")  # Start directory
+        self.current_path = os.path.expanduser("root")  # Start directory
         self.load_directory(self.current_path)
+
+    def open_path(self, path: str):
+        """Открывает конкретный путь в проводнике"""
+        if os.path.isdir(path):
+            self.load_directory(path)
+        else:
+            StellarMessageBox.warning(
+                self,
+                self.tr("Error"),
+                self.tr("Path does not exist or is not a directory: {}").format(path)
+            )
 
     def filter_items(self):
         """Filter files and folders based on search text"""
@@ -450,6 +461,66 @@ class ExplorerWindow(DraggableResizableWindow):
             StellarMessageBox.warning(self, self.tr("Error"), 
                                     self.tr("Could not open CMD in folder: {}").format(str(e)))
 
+    # def open_in_vscode(self, item: QListWidgetItem):
+    #     path = item.data(Qt.ItemDataRole.UserRole)
+    #     if not os.path.isfile(path):
+    #         StellarMessageBox.warning(self, self.tr("Error"), self.tr("Selected item is not a file"))
+    #         return
+
+    #     try:
+    #         vscode = None
+
+    #         # Проверяем, существует ли окно vscode в родительском окне
+    #         if hasattr(self.parent_window, 'open_windows'):
+    #             vscode = self.parent_window.open_windows.get("Vscode")
+
+    #             # Если окно существует, но было закрыто, создаем новое
+    #             if vscode is not None and not getattr(vscode, 'isVisible', lambda: False)():
+    #                 vscode = None
+    #                 self.parent_window.open_windows["Vscode"] = None
+
+    #         # Если vscode не существует, создаем новый экземпляр
+    #         if vscode is None:
+    #             try:
+    #                 # Динамически импортируем модуль Vscode
+    #                 vscode_module = __import__("apps.local.Vscode.Vscode", fromlist=["VscodeWindow"])
+    #                 VscodeWindow = getattr(vscode_module, "VscodeWindow")
+
+    #                 vscode = VscodeWindow(
+    #                     parent=self.parent_window,
+    #                     window_name="VSCode",
+    #                     translator=getattr(self.parent_window, 'tr', None),
+    #                     lang_code=getattr(self.parent_window, 'current_language', 'en')
+    #                 )
+
+    #                 # Сохраняем ссылку на vscode в родительском окне
+    #                 if hasattr(self.parent_window, 'open_windows'):
+    #                     self.parent_window.open_windows["Vscode"] = vscode
+    #             except Exception as e:
+    #                 StellarMessageBox.warning(
+    #                     self,
+    #                     self.tr("Error"),
+    #                     self.tr("Could not create VSCode window: {}").format(str(e))
+    #                 )
+    #                 return
+
+    #         # Загружаем файл и показываем vscode
+    #         if hasattr(vscode, 'open_file_by_path'):
+    #             vscode.open_file_by_path(path)
+    #             vscode.show()
+    #             vscode.raise_()
+    #             vscode.activateWindow()
+
+    #             # Обновляем родительское окно, если возможно
+    #             if hasattr(self.parent_window, 'switch_window'):
+    #                 self.parent_window.switch_window("Vscode")
+
+    #     except Exception as e:
+    #         StellarMessageBox.warning(
+    #             self,
+    #             self.tr("Error"),
+    #             self.tr("Could not open file in VSCode: {}").format(str(e))
+    #         )
     def open_in_vscode(self, item: QListWidgetItem):
         path = item.data(Qt.ItemDataRole.UserRole)
         if not os.path.isfile(path):
@@ -461,12 +532,18 @@ class ExplorerWindow(DraggableResizableWindow):
 
             # Проверяем, существует ли окно vscode в родительском окне
             if hasattr(self.parent_window, 'open_windows'):
-                vscode = self.parent_window.open_windows.get("vscode")
+                vscode = self.parent_window.open_windows.get("Vscode")
 
-                # Если окно существует, но было закрыто, создаем новое
-                if vscode is not None and not getattr(vscode, 'isVisible', lambda: False)():
-                    vscode = None
-                    self.parent_window.open_windows["vscode"] = None
+                # Проверяем, существует ли окно и видимо ли оно
+                if vscode is not None:
+                    # Если окно было закрыто (уничтожено), создаем новое
+                    try:
+                        # Простая проверка - пытаемся получить свойство окна
+                        _ = vscode.windowTitle()
+                    except RuntimeError:
+                        # Окно было уничтожено
+                        vscode = None
+                        self.parent_window.open_windows["Vscode"] = None
 
             # Если vscode не существует, создаем новый экземпляр
             if vscode is None:
@@ -484,7 +561,10 @@ class ExplorerWindow(DraggableResizableWindow):
 
                     # Сохраняем ссылку на vscode в родительском окне
                     if hasattr(self.parent_window, 'open_windows'):
-                        self.parent_window.open_windows["vscode"] = vscode
+                        self.parent_window.open_windows["Vscode"] = vscode
+                        
+                    print(f"[EXPLORER] Создано новое окно VSCode")
+                    
                 except Exception as e:
                     StellarMessageBox.warning(
                         self,
@@ -493,16 +573,51 @@ class ExplorerWindow(DraggableResizableWindow):
                     )
                     return
 
-            # Загружаем файл и показываем vscode
-            if hasattr(vscode, 'open_file_by_path'):
-                vscode.open_file_by_path(path)
+            # Загружаем файл в VSCode
+            try:
+                # Показываем окно
                 vscode.show()
                 vscode.raise_()
                 vscode.activateWindow()
+                
+                # Загружаем файл - используем метод open_file_by_path если он есть, иначе create_tab
+                if hasattr(vscode, 'open_file_by_path'):
+                    vscode.open_file_by_path(path)
+                    print(f"[EXPLORER] Файл открыт через open_file_by_path: {path}")
+                elif hasattr(vscode, 'create_tab'):
+                    # Используем существующий метод create_tab
+                    vscode.create_tab(title=os.path.basename(path), path=path)
+                    print(f"[EXPLORER] Файл открыт через create_tab: {path}")
+                else:
+                    # Альтернативный способ - напрямую загружаем в редактор
+                    try:
+                        with open(path, "r", encoding="utf-8") as f:
+                            content = f.read()
+                        language = vscode.detect_language(path) if hasattr(vscode, 'detect_language') else "plaintext"
+                        vscode.set_text(content, language)
+                        vscode.current_file = path
+                        print(f"[EXPLORER] Файл загружен напрямую: {path}")
+                    except Exception as read_error:
+                        StellarMessageBox.warning(
+                            self,
+                            self.tr("Error"),
+                            self.tr("Could not read file: {}").format(str(read_error))
+                        )
+                        return
 
                 # Обновляем родительское окно, если возможно
                 if hasattr(self.parent_window, 'switch_window'):
-                    self.parent_window.switch_window("vscode")
+                    self.parent_window.switch_window("Vscode")
+                    
+                print(f"[EXPLORER] Файл успешно открыт в VSCode: {path}")
+
+            except Exception as load_error:
+                StellarMessageBox.warning(
+                    self,
+                    self.tr("Error"),
+                    self.tr("Could not load file in VSCode: {}").format(str(load_error))
+                )
+                return
 
         except Exception as e:
             StellarMessageBox.warning(
@@ -510,6 +625,8 @@ class ExplorerWindow(DraggableResizableWindow):
                 self.tr("Error"),
                 self.tr("Could not open file in VSCode: {}").format(str(e))
             )
+            import traceback
+            print(f"[EXPLORER] Full error: {traceback.format_exc()}")
 
 
     def open_in_notebook(self, item: QListWidgetItem):
@@ -732,13 +849,27 @@ class ExplorerWindow(DraggableResizableWindow):
         self.update_nav_buttons()
 
         # Добавляем папки и файлы в QListWidget
+        # for name in sorted(items, key=lambda s: s.lower()):
+        #     full_path = os.path.join(path, name)
+        #     item = QListWidgetItem(name)
+        #     item.setData(Qt.ItemDataRole.UserRole, full_path)
+        #     icon = self.get_icon(full_path)
+        #     item.setIcon(icon)
+        #     self.file_list.addItem(item)
+        # Служебные папки, которые скрываем
+        excluded_folders = {"bin", ".git", "__pycache__"}
+        # Добавляем папки и файлы в QListWidget, игнорируя служебные
         for name in sorted(items, key=lambda s: s.lower()):
+            if name.lower() in excluded_folders:
+                continue  # пропускаем служебные папки
+
             full_path = os.path.join(path, name)
             item = QListWidgetItem(name)
             item.setData(Qt.ItemDataRole.UserRole, full_path)
             icon = self.get_icon(full_path)
             item.setIcon(icon)
             self.file_list.addItem(item)
+
 
         self.status_label.setText(self.tr("Loaded directory: {}").format(path))
 

@@ -16,6 +16,9 @@ class CustomContextMenu(QMenu):
         self.lang_code = lang_code
         self.setup_style()
         self.setup_actions()
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+
     
     def setup_style(self):
         """Настройка стилей меню"""
@@ -223,6 +226,8 @@ class CustomContextMenu_cmd(QMenu):
         self.lang_code = lang_code
         self.setup_style()
         self.setup_actions()
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.FramelessWindowHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
     def setup_style(self):
         """Настройка стилей меню"""

@@ -539,18 +539,35 @@ class CustomFileDialog(QDialog):
                 self.file_list.addItem(parent_item)
             
             # Add directories first
+            # for name in sorted(items, key=lambda s: s.lower()):
+            #     full_path = os.path.join(path, name)
+                
+            #     # Пропускаем папки с названием "bin"
+            #     if os.path.isdir(full_path) and name.lower() == "bin":
+            #         continue
+                    
+            #     if os.path.isdir(full_path):
+            #         item = QListWidgetItem(name)
+            #         item.setData(Qt.ItemDataRole.UserRole, full_path)
+            #         item.setIcon(self.get_icon(full_path))
+            #         self.file_list.addItem(item)
+            # Служебные папки, которые скрываем
+            excluded_folders = {"bin", ".git", "__pycache__"}
+
+            # Add directories first
             for name in sorted(items, key=lambda s: s.lower()):
                 full_path = os.path.join(path, name)
-                
-                # Пропускаем папки с названием "bin"
-                if os.path.isdir(full_path) and name.lower() == "bin":
+
+                # Пропускаем служебные папки
+                if os.path.isdir(full_path) and name.lower() in excluded_folders:
                     continue
-                    
+
                 if os.path.isdir(full_path):
                     item = QListWidgetItem(name)
                     item.setData(Qt.ItemDataRole.UserRole, full_path)
                     item.setIcon(self.get_icon(full_path))
                     self.file_list.addItem(item)
+
             
             # Add files
             for name in sorted(items, key=lambda s: s.lower()):

@@ -441,7 +441,7 @@ class SettingsWindow(DraggableResizableWindow):
         update_layout.addWidget(self.current_version_label)
 
         update_layout.addWidget(QLabel(self.tr("Update branch") + ":"))
-        self.branch_combo = QComboBox()
+        self.branch_combo = ComboBox()
         self.branch_combo.addItems(UPDATE_BRANCHES.keys())
         update_layout.addWidget(self.branch_combo)
 

@@ -221,37 +221,43 @@ class DraggableResizableWindow(QFrame):
         self.animation.start()
 
     def _on_close_animation_finished(self):
-	    """Полное освобождение ресурсов при закрытии окна"""
-	    # Остановка таймера бездействия
-	    self.inactive_timer.stop()
-	    
-	    # Освобождение ресурсов содержимого
-	    if hasattr(self, 'content_widget'):
-	        self.content_widget.deleteLater()
-	        del self.content_widget
-	    
-	    # Удаление из родительского окна
-	    window_name = None
-	    for name, window in self.parent().open_windows.items():
-	        if window == self:
-	            window_name = name
-	            break
+        """Полное освобождение ресурсов при закрытии окна"""
+        # Остановка таймера бездействия
+        self.inactive_timer.stop()
 
-	    if window_name:
-	        # Явно удаляем окно из словаря open_windows
-	        self.parent().open_windows[window_name] = None
-	        # Обновляем индикаторы в доке
-	        if hasattr(self.parent(), 'update_dock_indicators'):
-	            self.parent().update_dock_indicators()
-	        # Обновляем активные окна
-	        if hasattr(self.parent(), 'active_windows'):
-	            self.parent().active_windows[window_name] = False
+        # Если есть метод save_session — сохраняем вкладки
+        if hasattr(self, "save_session"):
+            try:
+                self.save_session()
+            except Exception as e:
+                print("[SESSION] Помилка збереження при закритті:", e)
 
-	    self.hide()
-	    if self.parent_window and hasattr(self.parent_window, "update_win_menu"):
-	        self.parent_window.update_win_menu("desktop")
-	    self.setParent(None)
-	    self.deleteLater()
+        # Освобождение ресурсов содержимого
+        if hasattr(self, 'content_widget'):
+            self.content_widget.deleteLater()
+            del self.content_widget
+
+        # Удаление из родительского окна
+        window_name = None
+        if self.parent():
+            for name, window in self.parent().open_windows.items():
+                if window == self:
+                    window_name = name
+                    break
+
+        if window_name:
+            self.parent().open_windows[window_name] = None
+            if hasattr(self.parent(), 'update_dock_indicators'):
+                self.parent().update_dock_indicators()
+            if hasattr(self.parent(), 'active_windows'):
+                self.parent().active_windows[window_name] = False
+
+        self.hide()
+        if self.parent_window and hasattr(self.parent_window, "update_win_menu"):
+            self.parent_window.update_win_menu("desktop")
+        self.setParent(None)
+        self.deleteLater()
+
 
     def set_content(self, widget):
         """Добавляет содержимое в окно с отслеживанием виджета"""

@@ -83,6 +83,7 @@ from CustomInputDialog import CustomInputDialog
 from CustomContextMenu import CustomContextMenu, ContextMenuMixin, CustomTextEdit, CustomPlainTextEdit, CustomLineEdit, CustomContextMenu_cmd, ContextMenuMixin_cmd, CustomTextEdit_cmd, CustomPlainTextEdit_cmd, CustomLineEdit_cmd
 from FileListContextMenu import FileListContextMenu
 from CustomFileDialog import CustomFileDialog
+from ComboBox import ComboBox
 
 
 from CalendarWidget import CalendarWidget

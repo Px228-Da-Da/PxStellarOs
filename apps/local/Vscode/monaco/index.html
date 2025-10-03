@@ -1,39 +1,181 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Monaco Editor</title>
-    <style>
-        html, body, #container {
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            overflow: hidden;
-            background-color: #1e1e1e;
-        }
-    </style>
+<meta charset="UTF-8">
+<title>VSCode (Lite)</title>
+<style>
+html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+#root { display: flex; flex-direction: row; height: 100%; }
+
+/* Левая панель */
+.activitybar {
+    width: 48px;
+    background-color: #252526;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px 0;
+}
+.activitybar button {
+    background: none;
+    border: none;
+    padding: 12px;
+    cursor: pointer;
+    color: #cccccc;
+    font-size: 18px;
+}
+.activitybar button:hover { background: #373737; }
+
+/* Explorer */
+.explorer {
+    width: 200px;
+    background: #1e1e1e;
+    color: #ccc;
+    overflow: auto;
+    padding: 4px;
+}
+
+/* Центральная зона */
+.main { flex: 1; display: flex; flex-direction: column; height: 100%; }
+
+#container { flex: 1; background: #1e1e1e; }
+
+/* Статус-бар */
+.statusbar {
+    height: 22px;
+    background: #007acc;
+    color: white;
+    font-size: 12px;
+    padding: 2px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.status-left, .status-right { display: flex; gap: 12px; align-items: center; }
+.status-left span, .status-right span { pointer-events: none; }
+</style>
 </head>
 <body>
-    <div id="container"></div>
-    <script src="./vs/loader.js"></script>
-    <script>
-        require.config({ paths: { 'vs': './vs' }});
-        require(['vs/editor/editor.main'], function () {
-            window.editor = monaco.editor.create(document.getElementById('container'), {
-                value: "",
-                language: "plaintext", // по умолчанию
-                theme: "vs-dark",
-                automaticLayout: true
-            });
+<div id="root">
+<!--     <div class="activitybar">
+        <button title="Explorer">📂</button>
+    </div>
+    <div class="explorer" id="explorer"></div> -->
+    <div class="main">
+        <div id="container"></div>
+        <div class="statusbar">
+            <div class="status-left"><span id="encoding">UTF-8</span></div>
+            <div class="status-right"><span id="position">Ln 1, Col 1</span></div>
+        </div>
+    </div>
+</div>
+
+<script src="./vs/loader.js"></script>
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+<script>
+// Глобально блокируем контекстное меню
+document.addEventListener("contextmenu", function (e) {
+    // Разрешаем только внутри редактора (#container)
+    if (!document.getElementById("container").contains(e.target)) {
+        e.preventDefault();
+        return false;
+    }
+}, false);
+require.config({ paths: { 'vs': './vs' }});
+require(['vs/editor/editor.main'], function () {
+    window.editor = monaco.editor.create(document.getElementById('container'), {
+        value: "",
+        language: "plaintext",
+        theme: "vs-dark",
+        automaticLayout: true,
+        minimap: { enabled: false }
+    });
+
+    window.encoding = 'UTF-8';
+
+    function updateStatus(encoding, line, col) {
+        var encEl = document.getElementById('encoding');
+        var posEl = document.getElementById('position');
+        if (encEl) encEl.textContent = encoding || 'UTF-8';
+        if (posEl) posEl.textContent = 'Ln ' + line + ', Col ' + col;
+    }
+    window.updateStatus = updateStatus;
+
+    editor.onDidChangeCursorPosition(function() {
+        var p = editor.getPosition();
+        updateStatus(window.encoding || 'UTF-8', p.lineNumber, p.column);
+    });
+    editor.onDidChangeModelContent(function() {
+        var p = editor.getPosition();
+        updateStatus(window.encoding || 'UTF-8', p.lineNumber, p.column);
+    });
+
+    // API для PyQt
+    window.getValue = () => window.editor.getValue();
+    window.setValueWithLanguage = function(code, lang) {
+        const old = window.editor.getModel();
+        if(old) old.dispose();
+        const model = monaco.editor.createModel(code, lang);
+        window.editor.setModel(model);
+        window.editor.layout();
+    };
+});
+
+// WebChannel
+// new QWebChannel(qt.webChannelTransport, function(channel) {
+//     window.bridge = channel.objects.bridge;
+
+//     document.querySelector('button[title="Explorer"]').addEventListener('click', () => {
+//         bridge.open_folder();  // теперь должно работать
+//     });
+// });
+
+
+// Показываем файлы в Explorer
+window.loadProjectFiles = function(files) {
+    const exp = document.getElementById('explorer');
+    exp.innerHTML = "";
+    files.forEach(f => {
+        const btn = document.createElement('button');
+        btn.textContent = f;
+        btn.style.display = "block";
+        btn.style.width = "100%";
+        btn.style.marginBottom = "2px";
+        btn.style.color = "#ccc";
+        btn.style.background = "none";
+        btn.style.border = "none";
+        btn.style.textAlign = "left";
+        btn.addEventListener('click', () => {
+            bridge.open_file(f);
         });
+        exp.appendChild(btn);
+    });
+};
 
-        window.getValue = function() {
-            return window.editor.getValue();
-        };
+function initWebChannel() {
+    new QWebChannel(qt.webChannelTransport, function(channel) {
+        window.bridge = channel.objects.bridge;
 
-        window.setValue = function(code) {
-            window.editor.setValue(code);
-        };
-    </script>
+        document.querySelector('button[title="Explorer"]').addEventListener('click', () => {
+            bridge.open_folder();
+        });
+    });
+}
+
+// Определяем setEncoding
+window.setEncoding = function(enc) {
+    window.encoding = enc;
+    const encEl = document.getElementById('encoding');
+    if(encEl) encEl.textContent = enc;
+};
+
+window.addEventListener('DOMContentLoaded', initWebChannel);
+</script>
 </body>
 </html>
+

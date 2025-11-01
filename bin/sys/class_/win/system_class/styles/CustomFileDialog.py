@@ -552,7 +552,7 @@ class CustomFileDialog(QDialog):
             #         item.setIcon(self.get_icon(full_path))
             #         self.file_list.addItem(item)
             # Служебные папки, которые скрываем
-            excluded_folders = {"bin", ".git", "__pycache__"}
+            excluded_folders = {".git", "__pycache__"}
 
             # Add directories first
             for name in sorted(items, key=lambda s: s.lower()):

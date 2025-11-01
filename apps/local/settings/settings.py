@@ -383,19 +383,24 @@ class SettingsWindow(DraggableResizableWindow):
         self.window_name = window_name
         self.lang_code = lang_code
         self.setGeometry(300, 150, 500, 400)
+        self.setMinimumSize(500, 400)
+        self.setMaximumSize(600, 500)
 
         main_widget = QWidget()
         main_layout = QHBoxLayout(main_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
 
         # --- Меню ---
         self.menu_list = QListWidget()
         self.menu_list.setFixedWidth(180)
-        self.menu_list.addItem(self.tr("General"))
         self.menu_list.addItem(self.tr("System Update"))
         self.menu_list.addItem(self.tr("Backups"))
-        self.menu_list.addItem(self.tr("Time"))   # ✅ вкладка времени
+        self.menu_list.addItem(self.tr("Time"))
+        self.menu_list.addItem(self.tr("Password"))
+        self.menu_list.addItem(self.tr("persin"))
 
-        # Кастомный скроллбар
+
         self.menu_list.setVerticalScrollBar(CastScrollBar(Qt.Orientation.Vertical))
         self.menu_list.setHorizontalScrollBar(CastScrollBar(Qt.Orientation.Horizontal))
 
@@ -426,82 +431,228 @@ class SettingsWindow(DraggableResizableWindow):
         self.content_area = QStackedWidget()
         self.content_area.setStyleSheet("background-color: #3B3B3B; color: white; font-size: 14px;")
 
-        # -------- General page --------
-        general_page = QWidget()
-        general_layout = QVBoxLayout(general_page)
-        general_layout.addWidget(QLabel(self.tr("General settings")))
-        general_layout.addWidget(QPushButton(self.tr("Save changes")))
-        self.content_area.addWidget(general_page)
-
-        # -------- Update page --------
+        ##### --- System Update Page --- #####
         update_page = QWidget()
-        update_layout = QVBoxLayout(update_page)
+        update_layout = QVBoxLayout()
+        update_layout.setSpacing(15)
+        update_layout.setContentsMargins(28, 28, 28, 28)
+        update_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        title_label_update = QLabel(self.tr("System Update"))
+        title_label_update.setStyleSheet("font-size: 16px; font-weight: 600; margin-bottom: 8px;")
+        update_layout.addWidget(title_label_update)
 
         self.current_version_label = QLabel(f"{self.tr('Current version')}: {get_current_version()}")
+        self.current_version_label.setStyleSheet("margin-bottom: 3px;")
         update_layout.addWidget(self.current_version_label)
 
-        update_layout.addWidget(QLabel(self.tr("Update branch") + ":"))
+        branch_row = QHBoxLayout()
+        branch_row.setSpacing(8)
+        branch_row.addWidget(QLabel(self.tr("Update branch") + ":"))
         self.branch_combo = ComboBox()
         self.branch_combo.addItems(UPDATE_BRANCHES.keys())
-        update_layout.addWidget(self.branch_combo)
+        self.branch_combo.setFixedWidth(140)
+        branch_row.addWidget(self.branch_combo)
+        branch_row.addStretch(1)
+        update_layout.addLayout(branch_row)
 
         self.check_update_button = QPushButton(self.tr("Check for updates"))
         self.check_update_button.clicked.connect(self.check_for_updates)
+        self.check_update_button.setMinimumHeight(32)
         update_layout.addWidget(self.check_update_button)
 
         self.update_button = QPushButton(self.tr("Update system"))
         self.update_button.clicked.connect(self.run_update)
         self.update_button.setEnabled(False)
+        self.update_button.setMinimumHeight(32)
         update_layout.addWidget(self.update_button)
 
         self.rollback_button = QPushButton(self.tr("Rollback update"))
         self.rollback_button.clicked.connect(self.rollback_update)
         self.rollback_button.setEnabled(os.path.exists("backup"))
+        self.rollback_button.setMinimumHeight(32)
         update_layout.addWidget(self.rollback_button)
 
+        update_layout.addStretch(1)
+
+        update_page.setLayout(update_layout)
         self.content_area.addWidget(update_page)
 
-        # -------- Backup page --------
+        ##### --- Backup Page --- #####
         backup_page = QWidget()
-        backup_layout = QVBoxLayout(backup_page)
+        backup_layout = QVBoxLayout()
+        backup_layout.setSpacing(13)
+        backup_layout.setContentsMargins(28, 28, 28, 28)
+        backup_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         self.backup_info_label = QLabel(self.tr("No backups created."))
+        self.backup_info_label.setStyleSheet("margin-bottom: 3px;")
         backup_layout.addWidget(self.backup_info_label)
 
         self.backup_list = QListWidget()
         self.backup_list.setVerticalScrollBar(CastScrollBar(Qt.Orientation.Vertical))
         self.backup_list.setHorizontalScrollBar(CastScrollBar(Qt.Orientation.Horizontal))
         self.backup_list.setStyleSheet("background-color: #2E2E2E; color: white; font-size: 14px; border-radius: 8px;")
+        self.backup_list.setMinimumHeight(90)
         backup_layout.addWidget(self.backup_list)
 
+        # Кнопки теперь идут друг под другом
         self.create_backup_button = QPushButton(self.tr("Create system backup"))
         self.create_backup_button.clicked.connect(self.create_system_backup)
+        self.create_backup_button.setMinimumHeight(32)
         backup_layout.addWidget(self.create_backup_button)
 
         self.restore_backup_button = QPushButton(self.tr("Restore from backup"))
         self.restore_backup_button.clicked.connect(self.restore_system_backup)
         self.restore_backup_button.setEnabled(False)
+        self.restore_backup_button.setMinimumHeight(32)
         backup_layout.addWidget(self.restore_backup_button)
 
         self.delete_backup_button = QPushButton(self.tr("Delete backup"))
         self.delete_backup_button.clicked.connect(self.delete_system_backup)
         self.delete_backup_button.setEnabled(False)
+        self.delete_backup_button.setMinimumHeight(32)
         backup_layout.addWidget(self.delete_backup_button)
 
+        backup_layout.addStretch(1)
+
+        backup_page.setLayout(backup_layout)
         self.content_area.addWidget(backup_page)
 
-        # -------- Time page -------- ✅
+        ##### --- Time Page --- #####
         time_page = QWidget()
-        time_layout = QVBoxLayout(time_page)
+        time_layout = QVBoxLayout()
+        time_layout.setSpacing(14)
+        time_layout.setContentsMargins(28, 28, 28, 28)
+        time_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        self.time_label = QLabel(self.tr("System time settings"))
-        time_layout.addWidget(self.time_label)
+        title_label_time = QLabel(self.tr("System time settings"))
+        title_label_time.setStyleSheet("font-size: 16px; font-weight: 600; margin-bottom: 8px;")
+        time_layout.addWidget(title_label_time)
 
         self.auto_time_button = QPushButton(self.tr("Set time automatically"))
         self.auto_time_button.clicked.connect(self.set_time_automatically)
+        self.auto_time_button.setMinimumHeight(32)
+        self.auto_time_button.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0.10);
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                border-radius: 6px;
+                color: white;
+                font-size: 14px;
+                padding: 6px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.20);
+            }
+            QPushButton:pressed {
+                background-color: rgba(255, 255, 255, 0.30);
+            }
+        """)
         time_layout.addWidget(self.auto_time_button)
 
+        time_layout.addStretch(1)
+        time_page.setLayout(time_layout)
         self.content_area.addWidget(time_page)
+
+        ##### --- Password Page --- #####
+        password_page = QWidget()
+        password_layout = QVBoxLayout()
+        password_layout.setSpacing(14)
+        password_layout.setContentsMargins(28, 28, 28, 28)
+        password_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        title_label_pass = QLabel(self.tr("Change system password"))
+        title_label_pass.setStyleSheet("font-size: 16px; font-weight: 600; margin-bottom: 8px;")
+        password_layout.addWidget(title_label_pass)
+
+        # Поле старого пароля
+        self.old_password_input = QLineEdit()
+        self.old_password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.old_password_input.setPlaceholderText(self.tr("Current password"))
+        self.old_password_input.setMinimumHeight(32)
+        self.old_password_input.setStyleSheet("padding-left: 8px;")
+        password_layout.addWidget(self.old_password_input)
+
+        # Поле нового пароля
+        self.new_password_input = QLineEdit()
+        self.new_password_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.new_password_input.setPlaceholderText(self.tr("New password"))
+        self.new_password_input.setMinimumHeight(32)
+        self.new_password_input.setStyleSheet("padding-left: 8px;")
+        password_layout.addWidget(self.new_password_input)
+
+        # Кнопка сохранения
+        self.save_password_button = QPushButton(self.tr("Save password"))
+        self.save_password_button.clicked.connect(self.save_new_password)
+        self.save_password_button.setMinimumHeight(32)
+        self.save_password_button.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0.10);
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                border-radius: 6px;
+                color: white;
+                font-size: 14px;
+                padding: 6px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.20);
+            }
+            QPushButton:pressed {
+                background-color: rgba(255, 255, 255, 0.30);
+            }
+        """)
+        password_row = QHBoxLayout()
+        password_row.addWidget(self.save_password_button)
+        password_row.addStretch(1)
+        password_layout.addLayout(password_row)
+
+        password_layout.addStretch(1)
+        password_page.setLayout(password_layout)
+        self.content_area.addWidget(password_page)
+        ##### --- Персоналізація --- #####
+        personalization_page = QWidget()
+        personalization_layout = QVBoxLayout()
+        personalization_layout.setSpacing(14)
+        personalization_layout.setContentsMargins(28, 28, 28, 28)
+        personalization_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        title_label_pers = QLabel("Персоналізація")
+        title_label_pers.setStyleSheet("font-size: 16px; font-weight: 600; margin-bottom: 8px;")
+        personalization_layout.addWidget(title_label_pers)
+        # Кнопка для зміни фону робочого столу
+        self.change_wallpaper_button = QPushButton(self.tr("Change desktop background"))
+        self.change_wallpaper_button.clicked.connect(self.change_wallpaper)
+        self.change_wallpaper_button.setMinimumHeight(32)
+        personalization_layout.addWidget(self.change_wallpaper_button)
+        # Кнопка для зміни фону екрана блокування
+        self.change_lock_button = QPushButton(self.tr("Change the background of the lock screen"))
+        self.change_lock_button.clicked.connect(self.change_lock_screen)
+
+        self.change_lock_button.setMinimumHeight(32)
+        personalization_layout.addWidget(self.change_lock_button)
+        personalization_layout.addStretch(1)
+        personalization_page.setLayout(personalization_layout)
+        self.content_area.addWidget(personalization_page)
+
+                # === Поточний фон екрана блокування ===
+        current_lock_label = QLabel(self.tr("Current lock screen background:"))
+        current_lock_label.setStyleSheet("font-size: 14px; margin-top: 10px; margin-bottom: 4px;")
+        personalization_layout.addWidget(current_lock_label)
+
+        self.lock_preview = QLabel()
+        self.lock_preview.setFixedSize(200, 120)
+        self.lock_preview.setStyleSheet("border: 1px solid rgba(255,255,255,0.2); border-radius: 6px;")
+        self.lock_preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        personalization_layout.addWidget(self.lock_preview)
+
+        # === Відкладене оновлення прев’ю ===
+        QTimer.singleShot(300, self.update_lock_preview)
+
+
+        # Завантажуємо поточне зображення
+        self.update_lock_preview()
+
+
 
         # -------- Layout --------
         self.menu_list.currentRowChanged.connect(self.content_area.setCurrentIndex)
@@ -512,9 +663,73 @@ class SettingsWindow(DraggableResizableWindow):
 
         if self.parent_window and hasattr(self.parent_window, "update_win_menu"):
             self.parent_window.update_win_menu(self.window_name)
+        
+        button_style = """
+            QPushButton {
+                background-color: rgba(255, 255, 255, 0.10);
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                border-radius: 6px;
+                color: white;
+                font-size: 14px;
+                padding: 6px;
+            }
+            QPushButton:hover {
+                background-color: rgba(255, 255, 255, 0.20);
+            }
+            QPushButton:pressed {
+                background-color: rgba(255, 255, 255, 0.30);
+            }
+            """
+        for button in [self.check_update_button, self.update_button, self.rollback_button, self.create_backup_button, self.restore_backup_button, self.delete_backup_button, self.auto_time_button, self.save_password_button, self.change_lock_button, self.change_wallpaper_button]:
+            button.setStyleSheet(button_style)
+
 
         self.update_backup_info()
         self.hide()
+
+    def save_new_password(self):
+        """Змінює пароль у файлі root/dataLacmi/user/password"""
+        password_file = os.path.join("root", "dataLacmi", "user", "password")
+
+        old_pass = self.old_password_input.text().strip()
+        new_pass = self.new_password_input.text().strip()
+
+        # Якщо новий пароль порожній — питаємо підтвердження
+        if new_pass == "":
+            reply = StellarMessageBox.question(
+                self, self.tr("Empty password"),
+                self.tr("Set empty password? (Screen will unlock without password)"))
+            if reply != StellarMessageBox.StandardButton.Yes:
+                return
+
+        # Зчитуємо поточний пароль (якщо є)
+        current_pass = ""
+        if os.path.exists(password_file):
+            try:
+                with open(password_file, "r", encoding="utf-8") as f:
+                    current_pass = f.read().strip()
+            except Exception as e:
+                StellarMessageBox.critical(self, self.tr("Error"), f"Cannot read password file:\n{e}")
+                return
+
+        # Перевіряємо старий пароль, якщо він заданий
+        if current_pass and current_pass.lower() != "none" and old_pass != current_pass:
+            StellarMessageBox.warning(self, self.tr("Error"), self.tr("Incorrect current password."))
+            return
+
+        # Записуємо новий пароль
+        try:
+            with open(password_file, "w", encoding="utf-8") as f:
+                if new_pass == "":
+                    f.write("none")  # якщо пустий → режим без пароля
+                else:
+                    f.write(new_pass)
+            StellarMessageBox.information(self, self.tr("Success"), self.tr("Password updated successfully."))
+            self.old_password_input.clear()
+            self.new_password_input.clear()
+        except Exception as e:
+            StellarMessageBox.critical(self, self.tr("Error"), f"Failed to save password:\n{e}")
+
 
     # --- Time sync ---
     def set_time_automatically(self):
@@ -723,3 +938,132 @@ class SettingsWindow(DraggableResizableWindow):
             self.backup_list.clear()
             self.restore_backup_button.setEnabled(False)
             self.delete_backup_button.setEnabled(False)
+
+    def change_wallpaper(self):
+        """Змінює фон робочого столу і записує шлях у desk.config"""
+        file_path, _ = CustomFileDialog.getOpenFileName(
+            self,
+            self.tr("Виберіть зображення для фону робочого столу"),
+            "",
+            "Зображення (*.png *.jpg *.jpeg);;Усі файли (*)"
+        )
+
+        if file_path:
+            try:
+                # === Копіюємо картинку ===
+                dest_path = os.path.join("bin", "icons", "local_icons", "IconOs", "wallpaper.jpg")
+                shutil.copy(file_path, dest_path)
+
+                # === Оновлюємо конфіг ===
+                config_path = os.path.join("root", "user", "desk", "desk.config")
+                data = {}
+
+                # Якщо існує — читаємо
+                if os.path.exists(config_path):
+                    try:
+                        with open(config_path, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                    except Exception:
+                        data = {}
+
+                # Оновлюємо або створюємо ключ
+                data["wallpaper_path"] = file_path
+
+                # Записуємо назад
+                with open(config_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, ensure_ascii=False, indent=4)
+
+                # Повідомлення
+                StellarMessageBox.information(
+                    self,
+                    self.tr("Успішно"),
+                    self.tr("Фон робочого столу змінено.")
+                )
+
+            except Exception as e:
+                StellarMessageBox.critical(
+                    self,
+                    self.tr("Помилка"),
+                    f"{self.tr('Не вдалося змінити фон')}: {str(e)}"
+                )
+
+
+    def change_lock_screen(self):
+        """Змінює фон екрана блокування і записує шлях у desk.config"""
+        import json, os, shutil
+
+        file_path, _ = CustomFileDialog.getOpenFileName(
+            self,
+            self.tr("Виберіть зображення для екрана блокування"),
+            "",
+            "Зображення (*.png *.jpg *.jpeg);;Усі файли (*)"
+        )
+
+        if file_path:
+            try:
+                # === Копіюємо зображення ===
+                dest_path = os.path.join("bin", "icons", "local_icons", "IconOs", "lock.jpg")
+                shutil.copy(file_path, dest_path)
+
+                # === Оновлюємо desk.config ===
+                config_path = os.path.join("root", "user", "desk", "desk.config")
+                data = {}
+
+                if os.path.exists(config_path):
+                    try:
+                        with open(config_path, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                    except Exception:
+                        data = {}
+
+                data["lockscreen_path"] = file_path
+
+                with open(config_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, ensure_ascii=False, indent=4)
+
+                StellarMessageBox.information(
+                    self,
+                    self.tr("Успішно"),
+                    self.tr("Фон екрана блокування змінено.")
+                )
+
+                # 🔥 Оновлюємо прев’ю після зміни
+                if hasattr(self, "update_lock_preview"):
+                    self.update_lock_preview()
+
+            except Exception as e:
+                StellarMessageBox.critical(
+                    self,
+                    self.tr("Помилка"),
+                    f"{self.tr('Не вдалося змінити фон блокування')}: {str(e)}"
+                )
+
+
+    def update_lock_preview(self):
+        """Оновлює прев’ю поточного фону екрана блокування"""
+        import json, os
+
+        if not hasattr(self, "lock_preview") or self.lock_preview is None:
+            return
+
+        config_path = os.path.join("root", "user", "desk", "desk.config")
+        image_path = None
+
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    image_path = data.get("lockscreen_path") or data.get("lock_screen_path")
+            except Exception as e:
+                print(f"[update_lock_preview] Помилка читання desk.config: {e}")
+
+        if not image_path or not os.path.exists(image_path):
+            image_path = os.path.join("bin", "icons", "local_icons", "IconOs", "lock.jpg")
+
+        pixmap = QPixmap(image_path).scaled(
+            self.lock_preview.width(),
+            self.lock_preview.height(),
+            Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+            Qt.TransformationMode.SmoothTransformation
+        )
+        self.lock_preview.setPixmap(pixmap)

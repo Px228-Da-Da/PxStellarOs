@@ -16,13 +16,337 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin")))
 from dependencies import *
 
 class ExplorerWindow(DraggableResizableWindow):
+    # def __init__(self, parent=None, window_name="Explorer", translator=None, lang_code="en"):
+    #     super().__init__(parent)
+    #     self.tr = translator if translator else lambda x: x
+    #     self.lang_code = lang_code  # Сохраняем переданный язык
+    #     self.parent_window = parent
+    #     self.window_name = window_name
+    #     self.lang_code = lang_code
+    #     self.icon_cache = {}
+    #     self.folder_icon = None
+    #     self.history = []
+    #     self.history_index = -1
+    #     self.clipboard = []
+    #     self.clipboard_operation = None
+
+    #     # Set window properties
+    #     self.setWindowTitle(self.tr("File Explorer"))
+    #     self.setGeometry(200, 100, 800, 600)
+
+    #     # Create a container widget for our content
+    #     self.container = QWidget()
+    #     self.content_layout.addWidget(self.container)  # Add to DraggableResizableWindow's content area
+
+    #     # Main layout - applied to our container widget
+    #     main_layout = QVBoxLayout(self.container)
+    #     main_layout.setContentsMargins(0, 0, 0, 0)
+    #     main_layout.setSpacing(0)
+
+    #     # Toolbar (top panel)
+    #     toolbar = QHBoxLayout()
+    #     toolbar.setContentsMargins(5, 5, 5, 5)
+    #     toolbar.setSpacing(5)
+
+    #     # Navigation buttons with local icons
+    #     nav_buttons = QHBoxLayout()
+    #     nav_buttons.setSpacing(2)
+
+    #     # Path to icons folder
+    #     icons_dir = os.path.join("bin", "icons", "local_icons")
+    #     os.makedirs(icons_dir, exist_ok=True)
+
+    #     # Back button
+    #     self.back_button = QPushButton()
+    #     back_icon = QIcon(os.path.join(icons_dir, "back.png"))
+    #     self.back_button.setIcon(back_icon)
+    #     self.back_button.setFixedSize(32, 32)
+    #     self.back_button.clicked.connect(self.go_back)
+
+    #     # Forward button
+    #     self.forward_button = QPushButton()
+    #     forward_icon = QIcon(os.path.join(icons_dir, "forward.png"))
+    #     self.forward_button.setIcon(forward_icon)
+    #     self.forward_button.setFixedSize(32, 32)
+    #     self.forward_button.clicked.connect(self.go_forward)
+
+    #     # Up button
+    #     self.up_button = QPushButton()
+    #     up_icon = QIcon(os.path.join(icons_dir, "up.png"))
+    #     self.up_button.setIcon(up_icon)
+    #     self.up_button.setFixedSize(32, 32)
+    #     self.up_button.clicked.connect(self.go_up)
+
+    #     # Home button
+    #     self.home_button = QPushButton()
+    #     home_icon = QIcon(os.path.join(icons_dir, "home.png"))
+    #     self.home_button.setIcon(home_icon)
+    #     self.home_button.setFixedSize(32, 32)
+    #     self.home_button.clicked.connect(lambda: self.load_directory(os.path.expanduser("root")))
+
+    #     # Refresh button
+    #     self.refresh_button = QPushButton()
+    #     refresh_icon = QIcon(os.path.join(icons_dir, "refresh.png"))
+    #     self.refresh_button.setIcon(refresh_icon)
+    #     self.refresh_button.setFixedSize(32, 32)
+    #     self.refresh_button.clicked.connect(lambda: self.load_directory(self.current_path))
+
+    #     nav_buttons.addWidget(self.back_button)
+    #     nav_buttons.addWidget(self.forward_button)
+    #     nav_buttons.addWidget(self.up_button)
+    #     nav_buttons.addWidget(self.home_button)
+
+    #     toolbar.addLayout(nav_buttons)
+
+    #     # Path field
+    #     self.path_edit = Input(
+    #         parent=self,
+    #         translator=self.tr,
+    #         lang_code=self.lang_code
+    #     )
+    #     self.path_edit.setPlaceholderText(self.tr("Enter path..."))
+    #     self.path_edit.returnPressed.connect(self.navigate_to_path)
+    #     self.path_edit.setMinimumHeight(32)
+        
+    #     # Search field
+    #     self.search_edit = Input(
+    #         parent=self,
+    #         translator=self.tr,
+    #         lang_code=self.lang_code
+    #     )
+    #     self.search_edit.setPlaceholderText(self.tr("Search..."))
+    #     self.search_edit.setMinimumHeight(32)
+    #     self.search_edit.setMaximumWidth(200)
+    #     self.search_edit.textChanged.connect(self.filter_items)
+        
+    #     # Add a search button with icon
+    #     self.search_button = QPushButton()
+    #     search_icon = QIcon(os.path.join(icons_dir, "search.png"))  # Make sure you have search.png in your icons folder
+    #     self.search_button.setIcon(search_icon)
+    #     self.search_button.setFixedSize(32, 32)
+    #     self.search_button.clicked.connect(self.filter_items)
+        
+    #     # Create a container for path and search fields
+    #     path_search_layout = QHBoxLayout()
+    #     path_search_layout.setSpacing(5)
+    #     path_search_layout.addWidget(self.path_edit, 1)
+    #     path_search_layout.addWidget(self.search_edit)
+    #     path_search_layout.addWidget(self.search_button)
+        
+    #     toolbar.addLayout(path_search_layout, 1)  # Add the combined layout to toolbar
+
+    #     # Refresh button
+    #     toolbar.addWidget(self.refresh_button)
+
+    #     main_layout.addLayout(toolbar)
+
+    #     # === Main area with sidebar, files and details panel ===
+    #     self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
+
+    #     # === Left panel (like Windows 11) ===
+    #     self.places_list = QListWidget()
+    #     self.places_list.setFixedWidth(200)
+    #     self.places_list.itemClicked.connect(self.on_place_clicked)
+
+    #     self.places_list.setStyleSheet("""
+    #         QListWidget {
+    #             background-color: rgba(25, 25, 25, 180);
+    #             border-right: 1px solid #444;
+    #             color: white;
+    #             font-size: 13px;
+    #         }
+    #         QListWidget::item:selected {
+    #             background-color: rgba(75, 110, 175, 200);
+    #         }
+    #     """)
+
+    #     self.main_splitter.addWidget(self.places_list)  # додали ліву панель
+    #     self.setup_places()
+
+    #     # === File list (center) ===
+    #     self.file_list = QListWidget()
+    #     self.file_list.setViewMode(QListWidget.ViewMode.IconMode)
+    #     self.file_list.setIconSize(QSize(45, 45))
+    #     self.file_list.setGridSize(QSize(150, 120))
+    #     self.file_list.setResizeMode(QListWidget.ResizeMode.Adjust)
+    #     self.file_list.setMovement(QListWidget.Movement.Static)
+    #     self.file_list.setWordWrap(True)
+    #     self.file_list.setUniformItemSizes(True)
+    #     self.file_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+    #     self.file_list.itemDoubleClicked.connect(self.on_item_double_clicked)
+    #     self.file_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+    #     self.file_list.customContextMenuRequested.connect(self.show_context_menu)
+    #     self.file_list.itemSelectionChanged.connect(self.update_file_details)
+    #     self.file_list.setVerticalScrollBar(CastScrollBar(Qt.Orientation.Vertical))
+    #     self.file_list.setHorizontalScrollBar(CastScrollBar(Qt.Orientation.Horizontal))
+
+    #     self.main_splitter.addWidget(self.file_list)
+
+    #     # === Details panel (right side) ===
+    #     # self.details_panel = QWidget()
+    #     # self.details_panel.setMinimumWidth(250)
+    #     # self.details_panel.setMaximumWidth(350)
+    #     # details_layout = QVBoxLayout(self.details_panel)
+    #     # details_layout.setContentsMargins(10, 10, 10, 10)
+
+    #     self.file_preview_label = QLabel()
+    #     self.file_preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    #     self.file_preview_label.setFixedSize(100, 100)
+
+    #     self.file_details_text = CustomTextEdit_cmd(
+    #         parent=self,
+    #         translator=self.tr,
+    #         lang_code=self.lang_code
+    #     )
+    #     self.file_details_text.setReadOnly(True)
+    #     self.file_details_text.setStyleSheet("""
+    #         QTextEdit {
+    #             background: transparent;
+    #             border: none;
+    #             color: white;
+    #             font-size: 12px;
+    #         }
+    #     """)
+
+    #     # details_layout.addWidget(self.file_preview_label, 0, Qt.AlignmentFlag.AlignHCenter)
+    #     # details_layout.addWidget(self.file_details_text, 1)
+
+    #     # self.main_splitter.addWidget(self.details_panel)
+
+    #     # Розподіл розмірів
+    #     self.main_splitter.setStretchFactor(0, 0)  # places_list
+    #     self.main_splitter.setStretchFactor(1, 3)  # file_list
+    #     self.main_splitter.setStretchFactor(2, 1)  # details_panel
+
+    #     # main_layout.addWidget(self.main_splitter, 1)
+
+
+
+    #     # Separator
+    #     separator = QFrame()
+    #     separator.setFrameShape(QFrame.Shape.HLine)
+    #     separator.setFrameShadow(QFrame.Shadow.Sunken)
+    #     main_layout.addWidget(separator)
+
+    #     # Main area with files and details panel
+    #     # self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        
+    #     # # File list widget with white text
+    #     # self.file_list = QListWidget()
+    #     # self.file_list.setViewMode(QListWidget.ViewMode.IconMode)
+    #     # self.file_list.setIconSize(QSize(45, 45))
+    #     # self.file_list.setGridSize(QSize(150, 120))
+    #     # self.file_list.setResizeMode(QListWidget.ResizeMode.Adjust)
+    #     # self.file_list.setMovement(QListWidget.Movement.Static)
+    #     # self.file_list.setWordWrap(True)
+    #     # self.file_list.setUniformItemSizes(True)
+    #     # self.file_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+    #     # self.file_list.itemDoubleClicked.connect(self.on_item_double_clicked)
+    #     # self.file_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+    #     # self.file_list.customContextMenuRequested.connect(self.show_context_menu)
+    #     # self.file_list.itemSelectionChanged.connect(self.update_file_details)
+    #     # self.file_list.setVerticalScrollBar(CastScrollBar(Qt.Orientation.Vertical))
+    #     # self.file_list.setHorizontalScrollBar(CastScrollBar(Qt.Orientation.Horizontal))
+        
+    #     # Custom border styling
+    #     self.file_list.setStyleSheet("""
+    #         QListWidget {
+    #             background-color: rgba(30, 30, 30, 180);
+    #             border: 1px solid #444;
+    #             border-radius: 4px;
+    #             padding: 2px;
+    #         }
+    #         QListWidget::item {
+    #             color: white;
+    #             padding: 5px;
+    #             border-radius: 3px;
+    #         }
+    #         QListWidget::item:hover {
+    #             background-color: rgba(60, 60, 60, 150);
+    #         }
+    #         QListWidget::item:selected {
+    #             background-color: rgba(75, 110, 175, 200);
+    #         }
+    #         QListWidget::item:selected:!active {
+    #             background-color: rgba(65, 90, 150, 200);
+    #         }
+    #     """)
+
+    #     # Set white text color for file list
+    #     palette = self.file_list.palette()
+    #     palette.setColor(QPalette.ColorRole.Text, QColor(255, 255, 255))
+    #     self.file_list.setPalette(palette)
+
+    #     # Details panel (right side)
+    #     self.details_panel = QWidget()
+    #     self.details_panel.setMinimumWidth(250)
+    #     self.details_panel.setMaximumWidth(350)
+    #     details_layout = QVBoxLayout(self.details_panel)
+    #     details_layout.setContentsMargins(10, 10, 10, 10)
+        
+    #     # Preview/icon section
+    #     self.file_preview_label = QLabel()
+    #     self.file_preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    #     self.file_preview_label.setFixedSize(100, 100)
+        
+    #     # File details section
+    #     self.file_details_text = CustomTextEdit_cmd(
+    #         parent=self,
+    #         translator=self.tr,
+    #         lang_code=self.lang_code
+    #     )
+    #     self.file_details_text.setReadOnly(True)
+    #     self.file_details_text.setStyleSheet("""
+    #         QTextEdit {
+    #             background: transparent;
+    #             border: none;
+    #             color: white;
+    #             font-size: 12px;
+    #         }
+    #     """)
+        
+    #     # Toggle button for details panel
+    #     self.toggle_details_button = QPushButton(">")
+    #     self.toggle_details_button.setFixedSize(20, 60)
+    #     self.toggle_details_button.setCheckable(True)
+    #     self.toggle_details_button.setChecked(True)
+    #     self.toggle_details_button.clicked.connect(self.toggle_details_panel)
+        
+    #     details_layout.addWidget(self.file_preview_label, 0, Qt.AlignmentFlag.AlignHCenter)
+    #     details_layout.addWidget(self.file_details_text, 1)
+        
+    #     # Add widgets to splitter
+    #     # self.main_splitter.addWidget(self.file_list)
+    #     self.main_splitter.addWidget(self.details_panel)
+    #     self.main_splitter.setStretchFactor(0, 3)
+    #     self.main_splitter.setStretchFactor(1, 1)
+        
+    #     # Add the splitter to main layout instead of just file_list
+    #     main_layout.addWidget(self.main_splitter, 1)
+
+    #     # Status bar
+    #     self.status_bar = QHBoxLayout()
+    #     self.status_bar.setContentsMargins(5, 2, 5, 2)
+
+    #     self.status_label = QLabel("")
+    #     self.status_label.setStyleSheet("""color: #fff;""")
+    #     self.status_label.setFont(QFont("Noto Sans", 9))
+    #     self.status_bar.addWidget(self.status_label, 1)
+
+    #     main_layout.addLayout(self.status_bar)
+
+    #     # Load icons
+    #     self.load_custom_icons()
+
+    #     # Initialization
+    #     self.current_path = os.path.expanduser("root")  # Start directory
+    #     self.load_directory(self.current_path)
     def __init__(self, parent=None, window_name="Explorer", translator=None, lang_code="en"):
         super().__init__(parent)
         self.tr = translator if translator else lambda x: x
-        self.lang_code = lang_code  # Сохраняем переданный язык
+        self.lang_code = lang_code
         self.parent_window = parent
         self.window_name = window_name
-        self.lang_code = lang_code
         self.icon_cache = {}
         self.folder_icon = None
         self.history = []
@@ -30,134 +354,117 @@ class ExplorerWindow(DraggableResizableWindow):
         self.clipboard = []
         self.clipboard_operation = None
 
-        # Set window properties
+        # === Window setup ===
         self.setWindowTitle(self.tr("File Explorer"))
-        self.setGeometry(200, 100, 800, 600)
+        self.setGeometry(200, 100, 900, 600)
 
-        # Create a container widget for our content
+        # === Root container ===
         self.container = QWidget()
-        self.content_layout.addWidget(self.container)  # Add to DraggableResizableWindow's content area
-
-        # Main layout - applied to our container widget
+        self.content_layout.addWidget(self.container)
         main_layout = QVBoxLayout(self.container)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # Toolbar (top panel)
+        # === Toolbar (top) ===
         toolbar = QHBoxLayout()
-        toolbar.setContentsMargins(5, 5, 5, 5)
-        toolbar.setSpacing(5)
+        toolbar.setContentsMargins(8, 8, 8, 8)
+        toolbar.setSpacing(6)
 
-        # Navigation buttons with local icons
-        nav_buttons = QHBoxLayout()
-        nav_buttons.setSpacing(2)
-
-        # Path to icons folder
         icons_dir = os.path.join("bin", "icons", "local_icons")
         os.makedirs(icons_dir, exist_ok=True)
 
-        # Back button
-        self.back_button = QPushButton()
-        back_icon = QIcon(os.path.join(icons_dir, "back.png"))
-        self.back_button.setIcon(back_icon)
-        self.back_button.setFixedSize(32, 32)
+        # Navigation buttons
+        nav_buttons = QHBoxLayout()
+        for name in ["back", "forward", "up", "home", "refresh"]:
+            btn = QPushButton()
+            btn.setFixedSize(32, 32)
+            icon_path = os.path.join(icons_dir, f"{name}.png")
+            if os.path.exists(icon_path):
+                btn.setIcon(QIcon(icon_path))
+            setattr(self, f"{name}_button", btn)
+            nav_buttons.addWidget(btn)
+
         self.back_button.clicked.connect(self.go_back)
-
-        # Forward button
-        self.forward_button = QPushButton()
-        forward_icon = QIcon(os.path.join(icons_dir, "forward.png"))
-        self.forward_button.setIcon(forward_icon)
-        self.forward_button.setFixedSize(32, 32)
         self.forward_button.clicked.connect(self.go_forward)
-
-        # Up button
-        self.up_button = QPushButton()
-        up_icon = QIcon(os.path.join(icons_dir, "up.png"))
-        self.up_button.setIcon(up_icon)
-        self.up_button.setFixedSize(32, 32)
         self.up_button.clicked.connect(self.go_up)
-
-        # Home button
-        self.home_button = QPushButton()
-        home_icon = QIcon(os.path.join(icons_dir, "home.png"))
-        self.home_button.setIcon(home_icon)
-        self.home_button.setFixedSize(32, 32)
         self.home_button.clicked.connect(lambda: self.load_directory(os.path.expanduser("root")))
-
-        # Refresh button
-        self.refresh_button = QPushButton()
-        refresh_icon = QIcon(os.path.join(icons_dir, "refresh.png"))
-        self.refresh_button.setIcon(refresh_icon)
-        self.refresh_button.setFixedSize(32, 32)
         self.refresh_button.clicked.connect(lambda: self.load_directory(self.current_path))
-
-        nav_buttons.addWidget(self.back_button)
-        nav_buttons.addWidget(self.forward_button)
-        nav_buttons.addWidget(self.up_button)
-        nav_buttons.addWidget(self.home_button)
 
         toolbar.addLayout(nav_buttons)
 
-        # Path field
-        self.path_edit = Input(
-            parent=self,
-            translator=self.tr,
-            lang_code=self.lang_code
-        )
+        # === Path field ===
+        self.path_edit = Input(parent=self, translator=self.tr, lang_code=self.lang_code)
         self.path_edit.setPlaceholderText(self.tr("Enter path..."))
         self.path_edit.returnPressed.connect(self.navigate_to_path)
         self.path_edit.setMinimumHeight(32)
-        
-        # Search field
-        self.search_edit = Input(
-            parent=self,
-            translator=self.tr,
-            lang_code=self.lang_code
-        )
+
+        # === Search field ===
+        self.search_edit = Input(parent=self, translator=self.tr, lang_code=self.lang_code)
         self.search_edit.setPlaceholderText(self.tr("Search..."))
         self.search_edit.setMinimumHeight(32)
         self.search_edit.setMaximumWidth(200)
         self.search_edit.textChanged.connect(self.filter_items)
-        
-        # Add a search button with icon
+
         self.search_button = QPushButton()
-        search_icon = QIcon(os.path.join(icons_dir, "search.png"))  # Make sure you have search.png in your icons folder
+        search_icon = QIcon(os.path.join(icons_dir, "search.png"))
         self.search_button.setIcon(search_icon)
         self.search_button.setFixedSize(32, 32)
         self.search_button.clicked.connect(self.filter_items)
-        
-        # Create a container for path and search fields
-        path_search_layout = QHBoxLayout()
-        path_search_layout.setSpacing(5)
-        path_search_layout.addWidget(self.path_edit, 1)
-        path_search_layout.addWidget(self.search_edit)
-        path_search_layout.addWidget(self.search_button)
-        
-        toolbar.addLayout(path_search_layout, 1)  # Add the combined layout to toolbar
 
-        # Refresh button
+        # Combine path + search
+        path_layout = QHBoxLayout()
+        path_layout.setSpacing(5)
+        path_layout.addWidget(self.path_edit, 1)
+        path_layout.addWidget(self.search_edit)
+        path_layout.addWidget(self.search_button)
+
+        toolbar.addLayout(path_layout, 1)
         toolbar.addWidget(self.refresh_button)
-
         main_layout.addLayout(toolbar)
 
-        # Separator
-        separator = QFrame()
-        separator.setFrameShape(QFrame.Shape.HLine)
-        separator.setFrameShadow(QFrame.Shadow.Sunken)
-        main_layout.addWidget(separator)
-
-        # Main area with files and details panel
+        # === Splitter: sidebar | files | details ===
         self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
-        
-        # File list widget with white text
+        self.main_splitter.setHandleWidth(2)
+
+        # === Left: Places list ===
+        self.places_list = QListWidget()
+        # self.places_list.setFixedWidth(200)
+        self.places_list.itemClicked.connect(self.on_place_clicked)
+        self.places_list.setVerticalScrollBar(CastScrollBar(Qt.Orientation.Vertical))
+        self.places_list.setHorizontalScrollBar(CastScrollBar(Qt.Orientation.Horizontal))
+        self.places_list.setStyleSheet("""
+            QListWidget {
+                background-color: #2E2E2E;
+                color: #E0E0E0;
+                border: none;
+                padding-top: 10px;
+                font-size: 15px;
+                outline: none;
+            }
+            QListWidget::item {
+                padding: 10px 10px;
+                margin: 4px;
+                border-radius: 8px;
+            }
+            QListWidget::item:selected {
+                background-color: #4C8ED9;
+                color: white;
+            }
+            QListWidget::item:hover {
+                background-color: #3C3C3C;
+            }
+        """)
+        self.main_splitter.addWidget(self.places_list)
+        self.setup_places()
+
+        # === Center: File list ===
         self.file_list = QListWidget()
         self.file_list.setViewMode(QListWidget.ViewMode.IconMode)
-        self.file_list.setIconSize(QSize(45, 45))
+        self.file_list.setIconSize(QSize(48, 48))
         self.file_list.setGridSize(QSize(150, 120))
         self.file_list.setResizeMode(QListWidget.ResizeMode.Adjust)
         self.file_list.setMovement(QListWidget.Movement.Static)
         self.file_list.setWordWrap(True)
-        self.file_list.setUniformItemSizes(True)
         self.file_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.file_list.itemDoubleClicked.connect(self.on_item_double_clicked)
         self.file_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -165,53 +472,40 @@ class ExplorerWindow(DraggableResizableWindow):
         self.file_list.itemSelectionChanged.connect(self.update_file_details)
         self.file_list.setVerticalScrollBar(CastScrollBar(Qt.Orientation.Vertical))
         self.file_list.setHorizontalScrollBar(CastScrollBar(Qt.Orientation.Horizontal))
-        
-        # Custom border styling
         self.file_list.setStyleSheet("""
             QListWidget {
-                background-color: rgba(30, 30, 30, 180);
-                border: 1px solid #444;
-                border-radius: 4px;
-                padding: 2px;
+                background-color: #252526;
+                border: none;
+                color: white;
+                font-size: 12px;
             }
             QListWidget::item {
-                color: white;
-                padding: 5px;
-                border-radius: 3px;
+                padding: 6px;
             }
             QListWidget::item:hover {
-                background-color: rgba(60, 60, 60, 150);
+                background-color: #2f2f2f;
             }
             QListWidget::item:selected {
-                background-color: rgba(75, 110, 175, 200);
-            }
-            QListWidget::item:selected:!active {
-                background-color: rgba(65, 90, 150, 200);
+                background-color: #3a6df0;
+                border-radius: 6px;
             }
         """)
+        self.main_splitter.addWidget(self.file_list)
 
-        # Set white text color for file list
-        palette = self.file_list.palette()
-        palette.setColor(QPalette.ColorRole.Text, QColor(255, 255, 255))
-        self.file_list.setPalette(palette)
-
-        # Details panel (right side)
+        # === Right: Details panel ===
         self.details_panel = QWidget()
         self.details_panel.setMinimumWidth(250)
         self.details_panel.setMaximumWidth(350)
         details_layout = QVBoxLayout(self.details_panel)
         details_layout.setContentsMargins(10, 10, 10, 10)
-        
-        # Preview/icon section
+        details_layout.setSpacing(8)
+
         self.file_preview_label = QLabel()
         self.file_preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.file_preview_label.setFixedSize(100, 100)
-        
-        # File details section
+
         self.file_details_text = CustomTextEdit_cmd(
-            parent=self,
-            translator=self.tr,
-            lang_code=self.lang_code
+            parent=self, translator=self.tr, lang_code=self.lang_code
         )
         self.file_details_text.setReadOnly(True)
         self.file_details_text.setStyleSheet("""
@@ -222,43 +516,57 @@ class ExplorerWindow(DraggableResizableWindow):
                 font-size: 12px;
             }
         """)
-        
-        # Toggle button for details panel
-        self.toggle_details_button = QPushButton(">")
-        self.toggle_details_button.setFixedSize(20, 60)
-        self.toggle_details_button.setCheckable(True)
-        self.toggle_details_button.setChecked(True)
-        self.toggle_details_button.clicked.connect(self.toggle_details_panel)
-        
+
+        self.file_details_text.setVerticalScrollBar(CastScrollBar(Qt.Orientation.Vertical))
+        self.file_details_text.setHorizontalScrollBar(CastScrollBar(Qt.Orientation.Horizontal))
+
         details_layout.addWidget(self.file_preview_label, 0, Qt.AlignmentFlag.AlignHCenter)
         details_layout.addWidget(self.file_details_text, 1)
-        
-        # Add widgets to splitter
-        self.main_splitter.addWidget(self.file_list)
         self.main_splitter.addWidget(self.details_panel)
-        self.main_splitter.setStretchFactor(0, 3)
-        self.main_splitter.setStretchFactor(1, 1)
-        
-        # Add the splitter to main layout instead of just file_list
+
+        # Stretch factors
+        self.main_splitter.setStretchFactor(0, 0)
+        self.main_splitter.setStretchFactor(1, 3)
+        self.main_splitter.setStretchFactor(2, 1)
         main_layout.addWidget(self.main_splitter, 1)
 
-        # Status bar
+        # === Status bar ===
         self.status_bar = QHBoxLayout()
-        self.status_bar.setContentsMargins(5, 2, 5, 2)
-
+        self.status_bar.setContentsMargins(5, 3, 5, 3)
         self.status_label = QLabel("")
-        self.status_label.setStyleSheet("""color: #fff;""")
-        self.status_label.setFont(QFont("Noto Sans", 9))
+        self.status_label.setStyleSheet("color: #bbb; font-size: 11px;")
         self.status_bar.addWidget(self.status_label, 1)
-
         main_layout.addLayout(self.status_bar)
 
-        # Load icons
+        # === Load icons and initialize ===
         self.load_custom_icons()
-
-        # Initialization
-        self.current_path = os.path.expanduser("root")  # Start directory
+        self.current_path = os.path.expanduser("root")
         self.load_directory(self.current_path)
+
+        # === Windows 11 visual polish ===
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #1e1e1e;
+                color: white;
+                font-family: "Segoe UI";
+            }
+            QPushButton {
+                background-color: #2a2a2a;
+                border: 1px solid #444;
+                border-radius: 6px;
+            }
+            QPushButton:hover {
+                background-color: #333;
+            }
+            QLineEdit {
+                background-color: #252525;
+                border: 1px solid #444;
+                border-radius: 6px;
+                padding-left: 8px;
+                height: 28px;
+            }
+        """)
+
 
     def open_path(self, path: str):
         """Открывает конкретный путь в проводнике"""
@@ -270,6 +578,57 @@ class ExplorerWindow(DraggableResizableWindow):
                 self.tr("Error"),
                 self.tr("Path does not exist or is not a directory: {}").format(path)
             )
+
+    def setup_places(self):
+        """Setup common places + disks"""
+        self.places_list.clear()
+
+        places = [
+            (self.tr("Desktop"), os.path.expanduser("root/user/desk")),
+            (self.tr("Documents"), os.path.expanduser("root/user/Documents")),
+            (self.tr("Downloads"), os.path.expanduser("root/user/download")),
+            (self.tr("Images"), os.path.expanduser("root/user/images")),
+        ]
+
+        for name, path in places:
+            if os.path.exists(path):
+                item = QListWidgetItem(f"📁 {name}")
+                item.setData(Qt.ItemDataRole.UserRole, path)
+                self.places_list.addItem(item)
+
+        # === Add drives (Windows-like “This PC”) ===
+        drives = self.get_drives()
+        if drives:
+            # self.places_list.addItem("───────────────")
+            for drive in drives:
+                item = QListWidgetItem(f"💽 {drive}")
+                item.setData(Qt.ItemDataRole.UserRole, drive)
+                self.places_list.addItem(item)
+
+    def get_drives(self):
+        """Повертає список доступних дисків"""
+        drives = []
+        if platform.system() == "Windows":
+            import string
+            from ctypes import windll
+            bitmask = windll.kernel32.GetLogicalDrives()
+            for letter in string.ascii_uppercase:
+                if bitmask & 1:
+                    drives.append(f"{letter}:\\")
+                bitmask >>= 1
+        else:
+            # Для Linux/macOS
+            mounts = ["/", "/mnt", "/media"]
+            for m in mounts:
+                if os.path.exists(m):
+                    drives.append(m)
+        return drives
+
+    def on_place_clicked(self, item):
+        path = item.data(Qt.ItemDataRole.UserRole)
+        if path and os.path.exists(path):
+            self.load_directory(path)
+
 
     def filter_items(self):
         """Filter files and folders based on search text"""

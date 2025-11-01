@@ -332,9 +332,15 @@ class BrowserWindow(DraggableResizableWindow):
         menu.exec(self.tab_widget.tabBar().mapToGlobal(position))
 
     def restart_tab(self, index):
+        tab_name = self.tab_widget.tabText(index)
+        if tab_name == self.tr("Settings"):
+            print("[INFO] Вкладку 'Settings' не можна перезапустити.")
+            return
+
         widget = self.tab_widget.widget(index)
         if isinstance(widget, QWebEngineView):
             widget.reload()
+
 
     def duplicate_tab(self, index):
         widget = self.tab_widget.widget(index)
@@ -424,9 +430,14 @@ class BrowserWindow(DraggableResizableWindow):
         downloads_button = QPushButton("📂")
         settings_button = QPushButton("⚙️")  # новая кнопка
 
-        back_button.clicked.connect(lambda: self.tab_widget.currentWidget().back())
-        forward_button.clicked.connect(lambda: self.tab_widget.currentWidget().forward())
-        reload_button.clicked.connect(lambda: self.tab_widget.currentWidget().reload())
+        # back_button.clicked.connect(lambda: self.tab_widget.currentWidget().back())
+        # forward_button.clicked.connect(lambda: self.tab_widget.currentWidget().forward())
+        back_button.clicked.connect(lambda: self.tab_widget.currentWidget().back() if isinstance(self.tab_widget.currentWidget(), QWebEngineView) else None)
+        forward_button.clicked.connect(lambda: self.tab_widget.currentWidget().forward() if isinstance(self.tab_widget.currentWidget(), QWebEngineView) else None)
+
+        # reload_button.clicked.connect(lambda: self.tab_widget.currentWidget().reload())
+        reload_button.clicked.connect(self.reload_current_tab)
+
         new_tab_button.clicked.connect(self.add_tab)
         downloads_button.clicked.connect(self.open_downloads_explorer)
         settings_button.clicked.connect(self.open_settings_tab)  # открываем вкладку настроек
@@ -470,6 +481,23 @@ class BrowserWindow(DraggableResizableWindow):
         self.add_title_widget(new_tab_button)  
         self.add_title_widget(downloads_button)
         self.add_title_widget(settings_button)  # добавляем кнопку на панель
+
+    def reload_current_tab(self):
+        current_index = self.tab_widget.currentIndex()
+        tab_name = self.tab_widget.tabText(current_index)
+        widget = self.tab_widget.currentWidget()
+
+        # Не перезапускаємо вкладку Settings
+        if tab_name == self.tr("Settings"):
+            print("[INFO] Вкладку 'Settings' не можна перезапустити.")
+            return
+
+        # Перевіряємо, чи це QWebEngineView (тобто вебсторінка)
+        if isinstance(widget, QWebEngineView):
+            widget.reload()
+        else:
+            print(f"[INFO] Вкладка '{tab_name}' не є вебсторінкою, перезапуск не потрібен.")
+
 
 
     def open_downloads_explorer(self):

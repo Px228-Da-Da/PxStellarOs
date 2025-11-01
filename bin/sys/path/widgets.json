@@ -1,0 +1,35 @@
+{
+    "time_button": { "x": 1245, "y": -60, "width": 120, "height": 45 },
+    "volume_button": { "x": 1184, "y": -60, "width": 45, "height": 45 },
+    "wifi_button": { "x": 1123, "y": -60, "width": 45, "height": 45 },
+    "start_button": { "x": 0, "y": -60, "width": 45, "height": 45 },
+    "dock_height": 45,
+
+    "top_offset": 33,
+    "bottom_offset": 100,
+    "left_offset": 0,
+    "right_offset": 0,
+
+    "clock_widget_sec": true,
+    "lock_clock_sec": true,
+    
+
+    "lock_logo": {
+        "x_offset": 0,
+        "y_offset": 0,
+        "scale": 0.3
+    },
+    "lock_clock_enable": true,
+    "lock_clock_pos": {
+        "x": 10,
+        "y": 10
+    },
+    "lock_login_pos": {
+        "x": 0,
+        "y": 0
+    },
+    "lock_main_button_pos": {
+        "x": 0,
+        "y": 100
+    }
+}

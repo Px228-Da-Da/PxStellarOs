@@ -1,15 +1,63 @@
-# Проверка зависимостей
+# # Проверка зависимостей
+# def install_dependencies():
+#     import subprocess
+#     import sys
+#     required = ["PyQt6", "PyQt6-WebEngine", "pywifi"]
+#     for package in required:
+#         try:
+#             __import__(package)
+#         except ImportError:
+#             subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
+# install_dependencies()
+# === Проверка и установка зависимостей ===
 def install_dependencies():
     import subprocess
     import sys
-    required = ["PyQt6", "PyQt6-WebEngine", "pywifi"]
-    for package in required:
-        try:
-            __import__(package)
-        except ImportError:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
 
+    # 🔹 Полный список библиотек, которые нужны твоему проекту
+    required_packages = [
+        # PyQt
+        "PyQt6",
+        "PyQt6-WebEngine",
+
+        # Сеть, обновления и системные вещи
+        "requests",
+        "pywifi",
+
+        # Аудио
+        "pycaw",
+        "comtypes",
+        "pulsectl",
+
+        # Архивация, служебные модули
+        "zipfile36",  # если zipfile встроен — pip просто проигнорирует
+        "hmac",       # стандартная библиотека, тоже пропустится
+
+        # Дополнительные зависимости проекта
+        "pillow",     # часто нужно для работы с изображениями
+    ]
+
+    print("🔍 Проверка установленных библиотек...\n")
+
+    for package in required_packages:
+        try:
+            __import__(package.replace("-", "_"))  # заменяем дефис на подчёркивание для импорта
+            print(f"✅ {package} уже установлено.")
+        except ImportError:
+            print(f"⬇ Устанавливаю {package} ...")
+            try:
+                subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+                print(f"✅ {package} установлено успешно!\n")
+            except Exception as e:
+                print(f"❌ Не удалось установить {package}: {e}\n")
+
+    print("\n✅ Проверка зависимостей завершена.\n")
+
+
+# --- Автоматически вызываем при запуске ---
 install_dependencies()
+
 
 import subprocess
 import sys
@@ -24,6 +72,8 @@ import datetime
 import requests
 import zipfile
 import shutil
+
+import hmac
 
 # Условные импорты для Windows
 if platform.system() == "Windows":
@@ -48,14 +98,18 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtGui import (
     QIcon, QColor, QEnterEvent, QMouseEvent, QKeyEvent, QCursor, QPixmap,
     QPainter, QBrush, QFont, QAction, QGuiApplication,
-    QPainter, QBrush, QLinearGradient, QColor, QPalette, QLinearGradient
+    QPainter, QBrush, QLinearGradient, QDrag, QPalette, QLinearGradient
 )
 
 from PyQt6.QtCore import (
     Qt, QSize, QRect, QEvent, QPropertyAnimation, QEasingCurve, QTimer,
     QTime, QDate, QUrl, QPoint, QProcess, pyqtProperty, QDateTime, QParallelAnimationGroup,
-    QRectF
+    QRectF, QMimeData
 )
+
+# from PyQt6.QtGui import QColor, 
+# from PyQt6.QtCore import 
+
 
 
 from bin.sys.class_.win.init import DraggableResizableWindow

@@ -16,8 +16,10 @@ from PyQt6.QtCore import Qt, QEvent
 from PyQt6.QtGui import QFont
 
 class CalcWindow(DraggableResizableWindow):
-    def __init__(self, parent=None, window_name="Calculator", translator=None, lang_code="en"):
-        super().__init__(parent, window_name)
+    # def __init__(self, parent=None, window_name="", translator=None, lang_code="en"):
+    #     super().__init__(parent)
+    def __init__(self, parent=None, window_name="Calculator", translator=None, lang_code="en", enable_maximize=False):
+        super().__init__(parent, window_name, enable_maximize=False)
         self.setFixedSize(320, 450)
         self.tr = translator if translator else lambda x: x
         self.parent_window = parent
@@ -71,7 +73,7 @@ class CalcWindow(DraggableResizableWindow):
 
         for text, pos in buttons:
             button = QPushButton(text)
-            button.setFixedSize(60, 60)
+            button.setFixedSize(50, 50)
             button.setFont(QFont("Segoe UI", 16))
             button.clicked.connect(self.on_button_click)
 

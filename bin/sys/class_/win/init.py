@@ -13,10 +13,11 @@ from PyQt6.QtGui import QAction
 import os
 
 class DraggableResizableWindow(QFrame):
-    def __init__(self, parent=None, window_name=""):
+    def __init__(self, parent=None, window_name="", enable_maximize=True):
         super().__init__(parent)
         self.parent_window = parent
         self.window_name = window_name
+        self.enable_maximize = enable_maximize  # ✅ новий параметр
         self.last_click_time = 0
         self.click_timer = QTimer()
         self.click_timer.setSingleShot(True)
@@ -105,6 +106,9 @@ class DraggableResizableWindow(QFrame):
         """)
         self.maximize_button.clicked.connect(self.toggle_maximize_restore)
 
+        # ✅ керуємо показом кнопки
+        self.maximize_button.setVisible(self.enable_maximize)
+
         title_layout.addWidget(self.close_button)
         title_layout.addWidget(self.minimize_button)
         title_layout.addWidget(self.maximize_button)
@@ -142,6 +146,14 @@ class DraggableResizableWindow(QFrame):
 
         # Флаг для отслеживания состояния ресурсов
         self.resources_released = False
+
+    def set_maximize_enabled(self, enabled: bool):
+        """Вмикає або вимикає кнопку розгортання вікна на весь екран."""
+        self.enable_maximize = enabled
+        if hasattr(self, "maximize_button"):
+            self.maximize_button.setVisible(enabled)
+
+
 
     def reset_click_count(self):
         self.click_count = 0
@@ -267,40 +279,142 @@ class DraggableResizableWindow(QFrame):
         self.content_layout.addWidget(widget)
         self.content_widget = widget  # Сохраняем ссылку для управления ресурсами
 
+    # def toggle_maximize_restore(self):
+    #     """Разворачивает/восстанавливает окно, беря отступы из bin/sys/path/widgets.json"""
+    #     import os, json
+
+    #     self.activate()
+
+    #     # === Загружаем настройки отступов ===
+    #     config_path = os.path.join("bin", "sys", "path", "widgets.json")
+    #     top_offset = 33
+    #     bottom_offset = 60
+
+    #     if os.path.exists(config_path):
+    #         try:
+    #             with open(config_path, "r", encoding="utf-8") as f:
+    #                 data = json.load(f)
+    #                 top_offset = data.get("top_offset", top_offset)
+    #                 bottom_offset = data.get("bottom_offset", bottom_offset)
+    #         except Exception as e:
+    #             print(f"[toggle_maximize_restore] Ошибка чтения widgets.json: {e}")
+
+    #     # === Подготовка анимации ===
+    #     if not hasattr(self, 'normal_geometry'):
+    #         self.normal_geometry = self.geometry()
+    #         self.is_maximized = False
+
+    #     self.animation = QPropertyAnimation(self, b"geometry")
+    #     self.animation.setDuration(200)
+    #     self.animation.setEasingCurve(QEasingCurve.Type.OutQuad)
+
+    #     # === Параметры экрана ===
+    #     screen = QApplication.primaryScreen()
+    #     screen_geometry = screen.geometry()           # вся область экрана
+    #     work_area = screen.availableGeometry()        # видимая часть без панели задач
+
+    #     if self.is_maximized:
+    #         # 🔽 Восстановление
+    #         self.animation.setStartValue(self.geometry())
+    #         self.animation.setEndValue(self.normal_geometry)
+    #         self.is_maximized = False
+    #     else:
+    #         # 🔼 Разворачивание с учетом JSON-отступов
+    #         self.normal_geometry = self.geometry()
+
+    #         total_height = screen_geometry.height()
+    #         bottom_bar_height = total_height - work_area.height()
+    #         real_bottom_offset = max(bottom_offset - bottom_bar_height, 0)
+
+    #         available_height = total_height - top_offset - real_bottom_offset
+
+    #         self.animation.setStartValue(self.geometry())
+    #         self.animation.setEndValue(QRect(
+    #             screen_geometry.x(),
+    #             screen_geometry.y() + top_offset,
+    #             screen_geometry.width(),
+    #             available_height
+    #         ))
+    #         self.is_maximized = True
+
+    #     self.animation.start()
+    #     self.raise_()
+
+    #     if self.parent_window and hasattr(self.parent_window, "update_win_menu"):
+    #         self.parent_window.update_win_menu(self.window_name)
     def toggle_maximize_restore(self):
+        """Разворачивает/восстанавливает окно, беря отступы из bin/sys/path/widgets.json"""
+        import os, json
+
         self.activate()
+
+        # === Загружаем настройки отступов ===
+        config_path = os.path.join("bin", "sys", "path", "widgets.json")
+
+        # Значения по умолчанию
+        top_offset = 33
+        bottom_offset = 60
+        left_offset = 0
+        right_offset = 0
+
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    top_offset = data.get("top_offset", top_offset)
+                    bottom_offset = data.get("bottom_offset", bottom_offset)
+                    left_offset = data.get("left_offset", left_offset)
+                    right_offset = data.get("right_offset", right_offset)
+            except Exception as e:
+                print(f"[toggle_maximize_restore] Ошибка чтения widgets.json: {e}")
+
+        # === Подготовка анимации ===
         if not hasattr(self, 'normal_geometry'):
             self.normal_geometry = self.geometry()
             self.is_maximized = False
-        
+
         self.animation = QPropertyAnimation(self, b"geometry")
         self.animation.setDuration(200)
         self.animation.setEasingCurve(QEasingCurve.Type.OutQuad)
-        
+
+        # === Параметры экрана ===
+        screen = QApplication.primaryScreen()
+        screen_geometry = screen.geometry()           # вся область экрана
+        work_area = screen.availableGeometry()        # видимая часть без панели задач
+
         if self.is_maximized:
+            # 🔽 Восстановление
             self.animation.setStartValue(self.geometry())
             self.animation.setEndValue(self.normal_geometry)
             self.is_maximized = False
         else:
+            # 🔼 Разворачивание с учетом JSON-отступов
             self.normal_geometry = self.geometry()
-            screen_geometry = QApplication.primaryScreen().availableGeometry()
-            top_offset = 33
-            available_height = screen_geometry.height() - top_offset
-            
+
+            total_height = screen_geometry.height()
+            total_width = screen_geometry.width()
+            bottom_bar_height = total_height - work_area.height()
+            real_bottom_offset = max(bottom_offset - bottom_bar_height, 0)
+
+            available_height = total_height - top_offset - real_bottom_offset
+            available_width = total_width - left_offset - right_offset
+
             self.animation.setStartValue(self.geometry())
             self.animation.setEndValue(QRect(
-                screen_geometry.x(),
+                screen_geometry.x() + left_offset,
                 screen_geometry.y() + top_offset,
-                screen_geometry.width(),
+                available_width,
                 available_height
             ))
             self.is_maximized = True
-        
+
         self.animation.start()
         self.raise_()
-        
+
         if self.parent_window and hasattr(self.parent_window, "update_win_menu"):
             self.parent_window.update_win_menu(self.window_name)
+
+
 
     def set_active(self, active):
         """Устанавливает состояние активности окна"""

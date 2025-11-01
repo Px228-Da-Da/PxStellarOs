@@ -36,41 +36,17 @@ class YoutubemusicWindow(DraggableResizableWindow):
         self.setWindowTitle(self.tr("YouTube Music"))
         self.setGeometry(300, 150, 1000, 700)
 
-        # Настраиваем профиль
-        self.profile = QWebEngineProfile("SublimeProfile", self)
-
-        # Создаем путь к папке browser внутри dataLacmi
-        browser_data_path = os.path.join(os.getcwd(), "root", "dataLacmi", "browser")
-        os.makedirs(browser_data_path, exist_ok=True)
-
-        self.profile.setPersistentStoragePath(os.path.join(browser_data_path, "web_profile"))
-        self.profile.setCachePath(os.path.join(browser_data_path, "web_cache"))
-
-        # 🔥 ВАЖНО: включаем сохранение cookies
-        self.profile.setPersistentCookiesPolicy(QWebEngineProfile.PersistentCookiesPolicy.ForcePersistentCookies)
-
-
         # Создаём центральный виджет для layout
         self.container = QWidget(self)  # <- это будет "центральный" виджет
         self.set_content(self.container)  # используем метод DraggableResizableWindow
         layout = QVBoxLayout(self.container)
         self.container.setLayout(layout)
 
-        # Настраиваем профиль
-        # self.profile = QWebEngineProfile("SublimeProfile", self)
-        # self.profile.setPersistentStoragePath(os.path.join(os.getcwd(), "web_profile"))
-        # self.profile.setCachePath(os.path.join(os.getcwd(), "web_cache"))
-        # Настраиваем профиль
-        self.profile = QWebEngineProfile("SublimeProfile", self)
-
-        # Создаем путь к папке browser внутри dataLacmi
-        browser_data_path = os.path.join(os.getcwd(), "root", "dataLacmi", "browser")
-
-        # Создаем папку, если она не существует
-        os.makedirs(browser_data_path, exist_ok=True)
-
-        self.profile.setPersistentStoragePath(os.path.join(browser_data_path, "web_profile"))
-        self.profile.setCachePath(os.path.join(browser_data_path, "web_cache"))
+        # Профиль для кеша/куков
+        self.profile = QWebEngineProfile("BrowserProfile", self)
+        cache_path = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.CacheLocation)
+        self.profile.setCachePath(cache_path)
+        self.profile.setPersistentStoragePath(cache_path)
 
 
         # Создаём браузер

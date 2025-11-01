@@ -57,6 +57,9 @@ from PyQt6.QtWidgets import QWidget, QLabel, QHBoxLayout, QVBoxLayout, QGraphics
 from PyQt6.QtGui import QPixmap, QFont, QIcon
 from PyQt6.QtCore import Qt, QSize, QRect, QEasingCurve, QPropertyAnimation
 
+from PyQt6.QtCore import QFileSystemWatcher
+
+
 class _SwitchCard(QWidget):
     def __init__(self, title: str, icon: QPixmap | None, selected=False, parent=None):
         super().__init__(parent)
@@ -345,6 +348,9 @@ class MacOSWindow(QMainWindow):
         self.wifi = pywifi.PyWiFi()
         self.iface = None
 
+        self.pinned_apps = set()  # Зберігає id закріплених додатків
+
+
         stylesheet = load_stylesheet("styles.qss")
         self.setStyleSheet(stylesheet)
         
@@ -370,6 +376,7 @@ class MacOSWindow(QMainWindow):
             self.background = QLabel(self)
             self.background.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.load_background_image()
+            self.watch_background_changes()
             
             # Основной контейнер
             central_widget = QWidget()
@@ -451,23 +458,43 @@ class MacOSWindow(QMainWindow):
         return self.translations.get(key, key)
 
     def create_start_button(self):
-        """Создает кнопку меню Пуск в правом нижнем углу"""
-        # Создаем контейнер для кнопки
+        """Создает кнопку меню Пуск с возможностью настройки позиции и размера через widgets.json"""
+        import os, json
+
+        config_path = os.path.join("bin", "sys", "path", "widgets.json")
+        config = {}
+
+        # === Загружаем конфиг ===
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+            except Exception as e:
+                print(f"[create_start_button] Ошибка чтения widgets.json: {e}")
+
+        # === Получаем параметры кнопки ===
+        start_cfg = config.get("start_button", {})
+        btn_x = start_cfg.get("x", 10)
+        btn_y = start_cfg.get("y", -65)
+        btn_w = start_cfg.get("width", 60)
+        btn_h = start_cfg.get("height", 60)
+
+        if btn_y < 0:
+            btn_y = self.height() + btn_y  # Считаем от нижнего края
+
+        # === Контейнер ===
         self.start_button_container = QWidget(self)
-        self.start_button_container.setFixedSize(60, 60)
-        self.start_button_container.move(
-            10,  # Позиция слева от кнопки времени
-            self.height() - 65   # Такая же высота как у кнопки времени
-        )
-        
-        # Вертикальный лэйаут для кнопки
+        self.start_button_container.setFixedSize(btn_w, btn_h)
+        self.start_button_container.move(btn_x, btn_y)
+
+        # === Лэйаут ===
         layout = QVBoxLayout(self.start_button_container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        
-        # Создаем кнопку
+
+        # === Кнопка Пуск ===
         self.start_button = QPushButton()
-        self.start_button.setFixedSize(60, 60)
+        self.start_button.setFixedSize(btn_w, btn_h)
         self.start_button.setObjectName("start_button")
         self.start_button.setStyleSheet("""
             QPushButton {
@@ -480,64 +507,108 @@ class MacOSWindow(QMainWindow):
                 background-color: rgba(255, 255, 255, 0.35);
             }
         """)
-        
-        # Иконка меню Пуск
+
+        # === Иконка ===
         self.start_icon = QLabel(self.start_button)
-        self.start_icon.setPixmap(QIcon(os.path.join("bin", "icons", "local_icons", "start.png")).pixmap(60, 60))
         self.start_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.start_icon.setGeometry(15, 15, 30, 30)
-        
+
+        def update_start_icon_size():
+            icon_size = min(btn_w, btn_h) * 0.65  # Иконка занимает 55% кнопки
+            pixmap = QIcon(os.path.join("bin", "icons", "local_icons", "start.png")).pixmap(int(icon_size), int(icon_size))
+            self.start_icon.setPixmap(pixmap)
+            self.start_icon.setGeometry(
+                int((btn_w - icon_size) / 2),
+                int((btn_h - icon_size) / 2),
+                int(icon_size),
+                int(icon_size)
+            )
+
+        update_start_icon_size()
         layout.addWidget(self.start_button)
-        
-        # Подключаем клик по кнопке меню Пуск
+
+        # === Обработчик клика ===
         self.start_button.clicked.connect(self.toggle_start_menu)
 
     def create_volume_button(self):
-        """Создает кнопку громкости в правом нижнем углу"""
-        # Создаем контейнер для кнопки
+        """Создает кнопку громкости с возможностью настройки размера и позиции через widgets.json"""
+        import os, json
+
+        config_path = os.path.join("bin", "sys", "path", "widgets.json")
+        config = {}
+
+        # Загружаем конфиг
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+            except Exception as e:
+                print(f"[create_volume_button] Ошибка чтения widgets.json: {e}")
+
+        # Получаем параметры кнопки
+        volume_cfg = config.get("volume_button", {})
+        btn_x = volume_cfg.get("x", self.width() - 190)
+        btn_y = volume_cfg.get("y", self.height() - 65)
+        btn_w = volume_cfg.get("width", 60)
+        btn_h = volume_cfg.get("height", 60)
+
+        if btn_y < 0:
+            btn_y = self.height() + btn_y  # Считаем от нижнего края
+
+        # === Контейнер ===
         self.volume_button_container = QWidget(self)
-        self.volume_button_container.setFixedSize(60, 60)
-        self.volume_button_container.move(
-            self.width() - 190,  # Позиция слева от кнопки времени
-            self.height() - 65   # Такая же высота как у кнопки времени
-        )
-        
-        # Вертикальный лэйаут для кнопки
+        self.volume_button_container.setFixedSize(btn_w, btn_h)
+        self.volume_button_container.move(btn_x, btn_y)
+
+        # === Лэйаут ===
         layout = QVBoxLayout(self.volume_button_container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        
-        # Создаем кнопку
-        self.volume_button = QPushButton()
-        self.volume_button.setFixedSize(60, 60)
 
+        # === Кнопка ===
+        self.volume_button = QPushButton()
+        self.volume_button.setFixedSize(btn_w, btn_h)
         self.volume_button.setObjectName("volume_button")
-        
-        # Иконка громкости
+
+        # === Иконка ===
         self.volume_icon = QLabel(self.volume_button)
-        self.volume_icon.setPixmap(QIcon(os.path.join("bin", "icons", "local_icons", "system", "volume.png")).pixmap(30, 30))
         self.volume_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.volume_icon.setGeometry(15, 15, 30, 30)
-        
+
+        # --- динамічне оновлення іконки при зміні розміру ---
+        def update_icon_size():
+            icon_size = min(btn_w, btn_h) * 0.65  # Іконка займає ~55% кнопки
+            pixmap = QIcon(
+                os.path.join("bin", "icons", "local_icons", "system", "volume.png")
+            ).pixmap(int(icon_size), int(icon_size))
+            self.volume_icon.setPixmap(pixmap)
+            self.volume_icon.setGeometry(
+                int((btn_w - icon_size) / 2),
+                int((btn_h - icon_size) / 2),
+                int(icon_size),
+                int(icon_size)
+            )
+
+
+        update_icon_size()
+
         layout.addWidget(self.volume_button)
-        
-        # Создаем виджет управления громкостью (изначально скрыт)
+
+        # === Виджет громкости ===
         self.volume_widget = VolumeControlWidget(
             parent=self,
-            translator=self.tr,  # Передаем функцию перевода из MacOSWindow
-            lang_code=self.current_language  # Передаем текущий язык
+            translator=self.tr,
+            lang_code=self.current_language
         )
         self.volume_widget.setParent(self)
-
         self.volume_widget.hide()
-        
-        # Подключаем клик по кнопке громкости
+
+        # === Сигналы ===
         self.volume_button.clicked.connect(self.toggle_volume_control)
-        
-        # Таймер для обновления иконки громкости
+
+        # === Таймер ===
         self.volume_timer = QTimer(self)
         self.volume_timer.timeout.connect(self.update_volume_icon)
         self.volume_timer.start(1000)
+
 
     def toggle_volume_control(self):
         """Показывает/скрывает панель управления громкостью"""
@@ -610,73 +681,90 @@ class MacOSWindow(QMainWindow):
     
     
     def create_time_button(self):
-        """Создает кнопку с временем и датой в правом нижнем углу"""
-        # Создаем контейнер для кнопки
+        """Создает кнопку с временем и датой с возможностью настройки позиции и размера через widgets.json"""
+        import os, json
+
+        config_path = os.path.join("bin", "sys", "path", "widgets.json")
+        config = {}
+
+        # Загружаем конфиг
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+            except Exception as e:
+                print(f"[create_time_button] Ошибка чтения widgets.json: {e}")
+
+        # Получаем параметры кнопки
+        time_cfg = config.get("time_button", {})
+        btn_x = time_cfg.get("x", self.width() - 120)
+        btn_y = time_cfg.get("y", self.height() - 65)
+        btn_w = time_cfg.get("width", 120)
+        btn_h = time_cfg.get("height", 60)
+
+        if btn_y < 0:
+            btn_y = self.height() + btn_y  # Считаем от нижнего края
+
+        # === Контейнер ===
         self.time_button_container = QWidget(self)
-        self.time_button_container.setFixedSize(120, 60)
-        self.time_button_container.move(
-            self.width() - 120,  # Правый край с отступом
-            self.height() - 65   # Нижний край с отступом
-        )
-        
-        # Вертикальный лэйаут для кнопки
+        self.time_button_container.setFixedSize(btn_w, btn_h)
+        self.time_button_container.move(btn_x, btn_y)
+
+        # === Лэйаут контейнера ===
         layout = QVBoxLayout(self.time_button_container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        
-        # Создаем кнопку
-        self.time_button = QPushButton()
-        self.time_button.setFixedSize(120, 60)
 
+        # === Кнопка ===
+        self.time_button = QPushButton()
+        self.time_button.setFixedSize(btn_w, btn_h)
         self.time_button.setObjectName("time_button")
 
-        
-        # Лэйаут для текста внутри кнопки
+        # === Внутренний лэйаут для текста ===
         text_layout = QVBoxLayout(self.time_button)
         text_layout.setContentsMargins(5, 5, 5, 5)
         text_layout.setSpacing(0)
-        
-        # Метка для времени
+
+        # Метка времени
         self.time_button_time = QLabel()
         self.time_button_time.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
         self.time_button_time.setObjectName("time_button_time")
-        
-        # Метка для даты
+
+        # Метка даты
         self.time_button_date = QLabel()
         self.time_button_date.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
         self.time_button_date.setObjectName("time_button_date")
-        
+
         text_layout.addWidget(self.time_button_time)
         text_layout.addWidget(self.time_button_date)
-        
+
         layout.addWidget(self.time_button)
-        
-        # Создаем виджет календаря (изначально скрыт)
+
+        # === Виджет календаря ===
         self.calendar_widget = CalendarWidget(
             parent=self,
-            translator=self.tr,  # Передаем функцию перевода из MacOSWindow
-            lang_code=self.current_language  # Передаем текущий язык
+            translator=self.tr,
+            lang_code=self.current_language
         )
         self.calendar_widget.setParent(self)
         self.calendar_widget.setFixedSize(350, 350)
-        self.calendar_widget.move(
-            self.width() - 370,  # Позиционируем слева от кнопки
-            self.height() - 420  # Позиционируем выше кнопки
-        )
         self.calendar_widget.hide()
-        
-        # Подключаем клик по кнопке времени
+
+        # Позиция календаря (можно тоже вынести в JSON)
+        self.calendar_widget.move(
+            self.width() - 370,
+            self.height() - 420
+        )
+
+        # === Подключаем события ===
         self.time_button.clicked.connect(self.toggle_calendar)
-        
-        # Обновляем время сразу
+
+        # === Таймер обновления времени ===
         self.update_time_button()
-        
-        # Таймер для обновления времени каждую секунду
         self.time_button_timer = QTimer(self)
         self.time_button_timer.timeout.connect(self.update_time_button)
         self.time_button_timer.start(1000)
+
 
     def toggle_calendar(self):
         """Показывает/скрывает календарь"""
@@ -721,166 +809,449 @@ class MacOSWindow(QMainWindow):
         self.calendar_animation.start()
     
     def update_time_button(self):
-        """Обновляет текст на кнопке времени"""
-        current_time = QTime.currentTime()
-        current_date = QDate.currentDate()
-        
-        # Форматируем время и дату
-        time_text = current_time.toString("hh:mm:ss")
-        date_text = current_date.toString("dd.MM.yyyy")
-        
-        # Устанавливаем текст
-        self.time_button_time.setText(time_text)
-        self.time_button_date.setText(date_text)
+        """Обновляет отображение времени и даты в кнопке"""
+        import os, json
+        from datetime import datetime
+
+        # === Загружаем настройку показа секунд ===
+        config_path = os.path.join("bin", "sys", "path", "widgets.json")
+        show_seconds = True  # по умолчанию показываем
+
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    # поддержка строк и булевых значений
+                    value = data.get("clock_widget_sec", "True")
+                    show_seconds = str(value).lower() in ("true", "1", "yes")
+            except Exception as e:
+                print(f"[update_time_button] Ошибка чтения widgets.json: {e}")
+
+        # === Формат времени ===
+        now = datetime.now()
+        time_format = "%H:%M:%S" if show_seconds else "%H:%M"
+        time_str = now.strftime(time_format)
+        date_str = now.strftime("%d.%m.%Y")
+
+        self.time_button_time.setText(time_str)
+        self.time_button_date.setText(date_str)
+
 
 
     def resizeEvent(self, event):
-        """Обновляет позицию элементов при изменении размера окна"""
+        """Обновляет позицию элементов при изменении размера окна (позиции читаются из widgets.json)"""
+        import json, os
         super().resizeEvent(event)
+
+        # Путь к файлу конфигурации
+        config_path = os.path.join("bin", "sys", "path", "widgets.json")
+        positions = {}
+
+        # Загружаем позиции, если файл существует
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    positions = json.load(f)
+            except Exception as e:
+                print(f"[resizeEvent] Ошибка чтения widgets.json: {e}")
+
+        def get_pos(name, default_x, default_y):
+            pos = positions.get(name, {"x": default_x, "y": default_y})
+            return pos.get("x", default_x), pos.get("y", default_y)
+
+        # === Перемещаем элементы ===
         if hasattr(self, 'time_button_container'):
-            self.time_button_container.move(
-                self.width() - 120,
-                self.height() - 65
-            )
+            x, y = get_pos('time_button', self.width() - 120, self.height() - 65)
+            if y < 0:
+                y = self.height() + y  # корректно считаем от нижнего края
+            self.time_button_container.move(x, y)
+
         if hasattr(self, 'volume_button_container'):
-            self.volume_button_container.move(
-                self.width() - 190,
-                self.height() - 65
-            )
+            x, y = get_pos('volume_button', self.width() - 190, self.height() - 65)
+            if y < 0:
+                y = self.height() + y
+            self.volume_button_container.move(x, y)
+
         if hasattr(self, 'wifi_button_container'):
-            self.wifi_button_container.move(
-                self.width() - 260,
-                self.height() - 65
-            )
-        if hasattr(self, 'calendar_widget') and self.calendar_widget.isVisible():
-            self.calendar_widget.move(
-                self.width() - 370,
-                self.height() - 420
-            )
-        if hasattr(self, 'volume_widget') and self.volume_widget.isVisible():
-            self.volume_widget.move(
-                self.width() - 370,
-                self.height() - 140
-            )
-        if hasattr(self, 'wifi_window') and self.wifi_window.isVisible():
-            self.wifi_window.move(
-                self.width() - 370,
-                self.height() - 520
-            )
+            x, y = get_pos('wifi_button', self.width() - 260, self.height() - 65)
+            if y < 0:
+                y = self.height() + y
+            self.wifi_button_container.move(x, y)
+
+        if hasattr(self, 'start_button_container'):
+            x, y = get_pos('start_button', 10, self.height() - 65)
+            if y < 0:
+                y = self.height() + y
+            self.start_button_container.move(x, y)
+
+        # Перерисовка фона
         self.load_background_image()
 
+    def watch_background_changes(self):
+        """Відстежує зміни у desk.config та оновлює фон"""
+        try:
+            config_path = self.desk_config if hasattr(self, "desk_config") else os.path.join("root", "user", "desk", "desk.config")
+            self.config_watcher = QFileSystemWatcher([config_path])
+            self.config_watcher.fileChanged.connect(self.on_background_config_changed)
+            print(f"[watch_background_changes] Відстеження запущено для: {config_path}")
+        except Exception as e:
+            print(f"[watch_background_changes] Помилка: {e}")
+
+    def on_background_config_changed(self):
+        """Автоматичне оновлення фону при зміні desk.config"""
+        try:
+            print("[on_background_config_changed] Змінено desk.config — оновлюю фон...")
+            self.load_background_image()
+
+            # Якщо Qt не бачить файл одразу — повторно додаємо його
+            if os.path.exists(self.desk_config):
+                self.config_watcher.addPath(self.desk_config)
+        except Exception as e:
+            print(f"[on_background_config_changed] Помилка при оновленні фону: {e}")
+
+
     def create_lock_screen(self):
-        """Создает экран блокировки."""
-        self.is_locked = True  # Устанавливаем флаг блокировки
+        """Создает экран блокировки. Если в файле пароль 'none' — показывает кнопку 'Войти'."""
+        import os, json
+        from datetime import datetime
+
+        self.is_locked = True
+        config_path = os.path.join("bin", "sys", "path", "widgets.json")
+
         # Если lock_widget уже существует, удаляем его
         if hasattr(self, 'lock_widget') and self.lock_widget is not None:
             self.lock_widget = None
 
-        # Создаем новый виджет для экрана блокировки
+        # === Создаем новый виджет ===
         self.lock_widget = QWidget(self)
         self.lock_widget.setGeometry(0, 0, self.width(), self.height())
 
-        # Устанавливаем фон (например, изображение)
-        background_pixmap = QPixmap(os.path.join("bin", "icons", "local_icons", "IconOs", "lock.jpg"))
-        background_label = QLabel(self.lock_widget)
-        background_label.setPixmap(background_pixmap.scaled(self.width(), self.height(), Qt.AspectRatioMode.KeepAspectRatioByExpanding))
-        background_label.setGeometry(0, 0, self.width(), self.height())
+        # === Фон ===
+        try:
+            import shutil
 
-        # Логотип
+            log_path = os.path.join("root", "user", "desk", "lock_debug.log")
+
+            def log(msg):
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write(f"{msg}\n")
+                print(msg)
+
+            desk_config_path = os.path.join("root", "user", "desk", "desk.config")
+            default_fallback = os.path.join("bin", "icons", "local_icons", "IconOs", "wallpaper_defolt.jpg")
+            lock_dest = os.path.join("bin", "icons", "local_icons", "IconOs", "lock.jpg")
+
+            background_path = None
+
+            # === Пробуємо прочитати з desk.config ===
+            if os.path.exists(desk_config_path):
+                try:
+                    with open(desk_config_path, "r", encoding="utf-8") as f:
+                        desk_data = json.load(f)
+                        background_path = desk_data.get("lock_screen_path") or desk_data.get("lockscreen_path")
+                        log(f"[LockScreen] Path from config: {background_path}")
+                except json.JSONDecodeError:
+                    log("[LockScreen] JSON decode error у desk.config")
+                except Exception as e:
+                    log(f"[LockScreen] Помилка читання desk.config: {e}")
+            else:
+                log(f"[LockScreen] desk.config не знайдено: {desk_config_path}")
+
+            # === Якщо фон не існує — fallback ===
+            if not background_path or not os.path.exists(background_path):
+                log(f"[LockScreen] Фон не знайдено, використовую дефолт: {default_fallback}")
+                background_path = default_fallback
+
+            # === Копіюємо фон у локальний lock.jpg ===
+            try:
+                os.makedirs(os.path.dirname(lock_dest), exist_ok=True)
+                if os.path.abspath(background_path) != os.path.abspath(lock_dest):
+                    shutil.copy(background_path, lock_dest)
+                    log(f"[LockScreen] Скопійовано фон: {background_path} → {lock_dest}")
+                else:
+                    log("[LockScreen] Шлях співпадає, копіювання пропущено.")
+            except Exception as e:
+                log(f"[LockScreen] Не вдалося скопіювати фон: {e}")
+                if not os.path.exists(lock_dest):
+                    background_path = default_fallback
+
+            # === Завантажуємо фінальне зображення ===
+            final_bg = lock_dest if os.path.exists(lock_dest) else default_fallback
+
+            pixmap = QPixmap(final_bg).scaled(
+                self.width(),
+                self.height(),
+                Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                Qt.TransformationMode.SmoothTransformation
+            )
+
+            self.background_label = QLabel(self.lock_widget)  # ✅ атрибут, щоб не зникав
+            self.background_label.setPixmap(pixmap)
+            self.background_label.setGeometry(0, 0, self.width(), self.height())
+            self.background_label.lower()
+
+            log(f"[LockScreen] Фінальний фон: {final_bg}")
+
+        except Exception as e:
+            with open("root/user/desk/lock_debug.log", "a", encoding="utf-8") as f:
+                f.write(f"[LockScreen] Головна помилка: {e}\n")
+            print(f"[LockScreen] Головна помилка: {e}")
+
+
+        # === Логотип ===
         icon_dir_path = os.path.join("bin", "icons", "local_icons", "IconOs", "OS.png")
         logo_pixmap = QPixmap(icon_dir_path)
-        scaled_pixmap = logo_pixmap.scaled(logo_pixmap.width() // 2, logo_pixmap.height() // 2, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+
+        # Загружаем параметры из widgets.json
+        logo_cfg = {}
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    logo_cfg = data.get("lock_logo", {})
+            except Exception as e:
+                print(f"[LockScreen] Ошибка чтения widgets.json для логотипа: {e}")
+
+        # Настройки по умолчанию
+        scale_factor = logo_cfg.get("scale", 0.5)
+        x_offset = logo_cfg.get("x_offset", 0)
+        y_offset = logo_cfg.get("y_offset", -50)
+
+        scaled_pixmap = logo_pixmap.scaled(
+            int(logo_pixmap.width() * scale_factor),
+            int(logo_pixmap.height() * scale_factor),
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation
+        )
+
         logo_label = QLabel(self.lock_widget)
         logo_label.setPixmap(scaled_pixmap)
         logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         logo_label.setGeometry(
-            (self.width() - scaled_pixmap.width()) // 2,
-            (self.height() - scaled_pixmap.height()) // 2 - 50,
+            (self.width() - scaled_pixmap.width()) // 2 + x_offset,
+            (self.height() - scaled_pixmap.height()) // 2 + y_offset,
             scaled_pixmap.width(),
             scaled_pixmap.height()
         )
 
-        # Метка для отображения времени (часы:минуты:секунды)
-        self.time_label = QLabel(self.lock_widget)
+        # === Загружаем настройки часов ===
+        show_lock_clock = True
+        show_lock_seconds = True
+        clock_pos = {"x": 10, "y": 10}  # позиция по умолчанию
 
-        self.time_label.setObjectName("time_label")
-        self.time_label.setGeometry(10, 10, 150, 30)  # Левый верхний угол
-        self.update_time_label()  # Установить начальное значение
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                    show_lock_clock = bool(cfg.get("lock_clock_enable", True))
+                    show_lock_seconds = str(cfg.get("lock_clock_sec", "True")).lower() in ("true", "1", "yes")
+                    clock_pos.update(cfg.get("lock_clock_pos", {}))  # подгружаем координаты
+            except Exception as e:
+                print(f"[LockScreen] Ошибка чтения widgets.json: {e}")
 
-        # Таймер для обновления времени каждую секунду
-        self.clock_timer = QTimer(self)
-        self.clock_timer.timeout.connect(self.update_time_label)
-        self.clock_timer.start(1000)  # 1000 мс = 1 секунда
+        # === Если часы включены — создаем их ===
+        if show_lock_clock:
+            self.time_label = QLabel(self.lock_widget)
+            self.time_label.setObjectName("time_label")
 
-        # Поле ввода пароля
-        self.password_input = InputPassword(
-            parent=self.lock_widget,
-            placeholder_text=self.tr("Password"),
-            initial_text="",  # Можно указать заранее введённый текст, если нужно
-            echo_mode=QLineEdit.EchoMode.Password,  # Или QLineEdit.EchoMode.Normal для обычного текста
-            translator=self.tr,  # Передаем функцию перевода из MacOSWindow
-            lang_code=self.current_language  # Передаем текущий язык
-        )
-        self.password_input.setGeometry(
-            (self.width() - 200) // 2,
-            logo_label.y() + logo_label.height() + 20,
-            200,
-            30
-        )
-        self.password_input.returnPressed.connect(self.unlock_screen)
-        self.password_input.setFocus()
+            # Позиция часов из JSON
+            clock_x = clock_pos.get("x", 10)
+            clock_y = clock_pos.get("y", 10)
+            self.time_label.setGeometry(clock_x, clock_y, 100, 40)
+            self.time_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+
+            # Функция обновления часов
+            def update_lock_time():
+                now = datetime.now()
+                fmt = "%H:%M:%S" if show_lock_seconds else "%H:%M"
+                self.time_label.setText(now.strftime(fmt))
+
+            update_lock_time()
+
+            # Таймер
+            self.clock_timer = QTimer(self)
+            self.clock_timer.timeout.connect(update_lock_time)
+            self.clock_timer.start(1000 if show_lock_seconds else 60000)
 
 
-        # Добавляем кнопку с картинкой 50x50
+        # === Загрузка пароля ===
+        password_path = os.path.join("root", "dataLacmi", "user", "password")
+        self._lock_password = None
+        try:
+            with open(password_path, "r", encoding="utf-8") as f:
+                self._lock_password = f.read().strip()
+        except FileNotFoundError:
+            self._lock_password = None
+        except Exception as e:
+            print(f"[LockScreen] Ошибка чтения пароля: {e}")
+            self._lock_password = None
+
+        # === Загружаем позицию кнопки/поля входа ===
+        login_pos = {"x": 0, "y": 20}
+        config_path = os.path.join("bin", "sys", "path", "widgets.json")
+
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                    login_pos.update(cfg.get("lock_login_pos", {}))
+            except Exception as e:
+                print(f"[LockScreen] Ошибка чтения widgets.json для позиции кнопки входа: {e}")
+
+        # === Если 'none' → кнопка входа ===
+        if self._lock_password and self._lock_password.lower() == "none":
+            self.password_input = None
+            self.login_button = QPushButton(self.tr("sing"), self.lock_widget)
+            self.login_button.setObjectName("login_button")
+            self.login_button.setFixedSize(200, 36)
+
+            # Применяем позицию из JSON
+            btn_x = (self.width() - 200) // 2 + login_pos["x"]
+            btn_y = logo_label.y() + logo_label.height() + login_pos["y"]
+            self.login_button.move(btn_x, btn_y)
+
+            self.login_button.clicked.connect(self.unlock_screen)
+            self.login_button.setStyleSheet("""
+            QPushButton#login_button {
+                background-color: rgba(255, 255, 255, 0.1);
+                border: 1px solid rgba(255, 255, 255, 0.25);
+                border-radius: 8px;
+                color: white;
+                font-size: 15px;
+                font-weight: 500;
+                letter-spacing: 0.5px;
+                padding: 6px 0;
+            }
+            QPushButton#login_button:hover {
+                background-color: rgba(255, 255, 255, 0.25);
+                border: 1px solid rgba(255, 255, 255, 0.4);
+            }
+            QPushButton#login_button:pressed {
+                background-color: rgba(255, 255, 255, 0.35);
+                border: 1px solid rgba(255, 255, 255, 0.5);
+            }
+            """)
+            self.login_button.setFocus()
+
+        else:
+            # === Поле ввода пароля ===
+            self.login_button = None
+            self.password_input = InputPassword(
+                parent=self.lock_widget,
+                placeholder_text=self.tr("Password"),
+                initial_text="",
+                echo_mode=QLineEdit.EchoMode.Password,
+                translator=self.tr,
+                lang_code=self.current_language
+            )
+            input_x = (self.width() - 200) // 2 + login_pos["x"]
+            input_y = logo_label.y() + logo_label.height() + login_pos["y"]
+            self.password_input.setGeometry(input_x, input_y, 200, 30)
+
+            self.password_input.returnPressed.connect(self.unlock_screen)
+            self.password_input.setFocus()
+
+            if hasattr(self, "password_input") and self.password_input is not None:
+                self.password_input.setFocus()
+            elif hasattr(self, "login_button") and self.login_button is not None:
+                self.login_button.setFocus()
+
+
+        # === Кнопка с картинкой (основная) ===
         self.main_button = QPushButton(self.lock_widget)
-        self.main_button.setIcon(QIcon(os.path.join("bin", "icons", "local_icons", "IconOs", "shutdown.png")))  # Укажите путь к изображению
+        self.main_button.setIcon(QIcon(os.path.join("bin", "icons", "local_icons", "IconOs", "shutdown.png")))
         self.main_button.setIconSize(QSize(50, 50))
         self.main_button.setFixedSize(50, 50)
-
         self.main_button.setObjectName("main_button")
-        self.main_button.move((self.width() - 50) // 2, logo_label.y() + logo_label.height() + 80)
+
+        # Загружаем позицию кнопки из JSON
+        main_btn_pos = {"x": 0, "y": 80}  # значения по умолчанию
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    cfg = json.load(f)
+                    main_btn_pos.update(cfg.get("lock_main_button_pos", {}))
+            except Exception as e:
+                print(f"[LockScreen] Ошибка чтения widgets.json для lock_main_button_pos: {e}")
+
+        # Применяем позицию
+        btn_x = (self.width() - 50) // 2 + main_btn_pos["x"]
+        btn_y = logo_label.y() + logo_label.height() + main_btn_pos["y"]
+        self.main_button.move(btn_x, btn_y)
+
+        # Подключаем событие
         self.main_button.clicked.connect(self.toggle_additional_buttons)
 
-        # Контейнер для дополнительных кнопок
+
+        # === Контейнер для дополнительных кнопок ===
         self.additional_buttons_container = QWidget(self.lock_widget)
         self.additional_buttons_container.setGeometry(
-            (self.width() - 150) // 2,  # Центрируем по горизонтали
-            self.main_button.y() - 60,  # Размещаем выше основной кнопки
-            150,  # Ширина контейнера
-            100   # Высота контейнера
+            (self.width() - 150) // 2,
+            self.main_button.y() - 60,
+            150,
+            100
         )
-
         self.additional_buttons_container.setObjectName("additional_buttons_container")
-        self.additional_buttons_container.hide()  # Скрываем контейнер по умолчанию
+        self.additional_buttons_container.hide()
 
-        # Вертикальный лэйаут для дополнительных кнопок
+
+        # Лэйаут и кнопки
         additional_layout = QVBoxLayout(self.additional_buttons_container)
         additional_layout.setSpacing(10)
         additional_layout.setContentsMargins(10, 10, 10, 10)
 
-        # Первая дополнительная кнопка
-        self.button1 = QPushButton(self.tr("Shutdown"), self)  # Текст кнопки
-        self.button1.setIcon(QIcon(os.path.join("bin", "icons", "local_icons", "IconOs", "shutdown.png")))  # Иконка кнопки
-        self.button1.setIconSize(QSize(30, 30))  # Размер иконки
-        self.button1.setFixedSize(120, 40)  # Размер кнопки (ширина, высота)
-        self.button1.clicked.connect(self.shutdown_system)  # Используем clicked.connect
+                # === Кнопки завершення та перезавантаження ===
+        button_style = """
+        QPushButton {
+            background-color: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 10px;
+            padding-left: 12px;
+            text-align: left;
+        }
 
+        QPushButton:hover {
+            background-color: rgba(255, 255, 255, 0.18);
+            border: 1px solid rgba(255, 255, 255, 0.35);
+        }
+
+        QPushButton:pressed {
+            background-color: rgba(255, 255, 255, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.45);
+        }
+
+        QPushButton::icon {
+            margin-right: 8px;
+        }
+        """
+
+        # Кнопка Shutdown
+        self.button1 = QPushButton(self.tr("Shutdown"), self)
         self.button1.setObjectName("shutdown_button")
-        additional_layout.addWidget(self.button1)  # Добавляем кнопку в лэйаут
+        self.button1.setIcon(QIcon(os.path.join("bin", "icons", "local_icons", "IconOs", "shutdown.png")))
+        self.button1.setIconSize(QSize(28, 28))
+        self.button1.setFixedSize(130, 42)
+        self.button1.clicked.connect(self.shutdown_system)
+        self.button1.setStyleSheet(button_style)
+        additional_layout.addWidget(self.button1)
 
-        # Вторая дополнительная кнопка
-        self.button2 = QPushButton(self.tr("Reboot"), self)  # Текст кнопки
-        self.button2.setIcon(QIcon(os.path.join("bin", "icons", "local_icons", "IconOs", "reboot.png")))  # Иконка кнопки
-        self.button2.setIconSize(QSize(30, 30))  # Размер иконки
-        self.button2.setFixedSize(120, 40)  # Размер кнопки (ширина, высота)
-        self.button2.clicked.connect(self.reboot_system)  # Используем clicked.connect
-
+        # Кнопка Reboot
+        self.button2 = QPushButton(self.tr("Reboot"), self)
         self.button2.setObjectName("reboot_button")
-        additional_layout.addWidget(self.button2)  # Добавляем кнопку в лэйаут
+        self.button2.setIcon(QIcon(os.path.join("bin", "icons", "local_icons", "IconOs", "reboot.png")))
+        self.button2.setIconSize(QSize(28, 28))
+        self.button2.setFixedSize(130, 42)
+        self.button2.clicked.connect(self.reboot_system)
+        self.button2.setStyleSheet(button_style)
+        additional_layout.addWidget(self.button2)
 
-        # Обработчики событий для скрытия/показа контейнера
+        # Обработчики событий
         self.additional_buttons_container.enterEvent = self.additional_buttons_enter_event
         self.additional_buttons_container.leaveEvent = self.additional_buttons_leave_event
+
 
     def update_time_label(self):
         current_time = QTime.currentTime().toString("HH:mm:ss")
@@ -917,43 +1288,75 @@ class MacOSWindow(QMainWindow):
             self.animation.finished.connect(lambda: widget.hide())  # Скрываем виджет после завершения анимации
         self.animation.start()
 
-
     def unlock_screen(self):
-        """Разблокирует экран, если пароль верный."""
-        # Проверяем, существует ли еще виджет и поле ввода пароля
+        """Разблокирует экран, если пароль верный. Поддерживает режим 'none' (кнопка входа)."""
+        # Проверяем, существует ли еще виджет блокировки
         if not hasattr(self, 'lock_widget') or self.lock_widget is None:
-            return  # Если виджет уже удален, выходим из метода
+            return
 
-        if not hasattr(self, 'password_input') or self.password_input is None:
-            return  # Если поле ввода пароля уже удалено, выходим из метода
-
-        # Проверяем, существует ли объект password_input
+        # Если есть поле password_input — проверяем текст оттуда.
+        # Если поля нет, но есть login_button — считаем это режимом "none" и разрешаем вход.
         try:
-            # Проверяем пароль (например, пароль "0000")
-            if self.password_input.text() == "":
+            # вариант — режим з кнопкою (файл містив "none")
+            if (not hasattr(self, 'password_input') or self.password_input is None) and \
+               (hasattr(self, 'login_button') and self.login_button is not None):
+                # Режим без пароля — просто розблоковуємо
+                allowed = True
+            elif hasattr(self, 'password_input') and self.password_input is not None:
+                entered = self.password_input.text()
+                # Якщо пароль з файлу встановлено в self._lock_password, порівнюємо з ним.
+                if hasattr(self, "_lock_password") and self._lock_password:
+                    allowed = (entered == self._lock_password)
+                else:
+                    # Якщо пароля в конфі ні — можна визначити правило (наприклад, порожній рядок)
+                    allowed = (entered == "")
+            else:
+                # Немає ні поля, ні кнопки — нічого не робимо
+                return
+
+            if allowed:
                 self.is_locked = False
 
                 # Остановить и удалить таймер и метку времени
-                if hasattr(self, "clock_timer"):
-                    self.clock_timer.stop()
-                    self.clock_timer.deleteLater()
+                if hasattr(self, "clock_timer") and self.clock_timer:
+                    try:
+                        self.clock_timer.stop()
+                        self.clock_timer.deleteLater()
+                    except Exception:
+                        pass
 
+                # Якщо був лоґін баттон — видаляємо його
+                if hasattr(self, "login_button") and self.login_button is not None:
+                    try:
+                        self.login_button.deleteLater()
+                    except Exception:
+                        pass
+                    self.login_button = None
+
+                # Якщо було поле вводу — видаляємо його
+                if hasattr(self, "password_input") and self.password_input is not None:
+                    try:
+                        self.password_input.deleteLater()
+                    except Exception:
+                        pass
+                    self.password_input = None
+
+                # Анімація закриття екрану блокування
                 self.animation = QPropertyAnimation(self.lock_widget, b"geometry")
                 self.animation.setDuration(200)
                 self.animation.setStartValue(QRect(0, 0, self.width(), self.height()))
                 self.animation.setEndValue(QRect(0, -self.height(), self.width(), self.height()))
                 self.animation.finished.connect(self.lock_widget.deleteLater)
                 self.animation.start()
-
-                # Удаляем виджет после завершения анимации
-                self.animation.finished.connect(self.lock_widget.deleteLater)
-                self.animation.start()
             else:
-                # Показываем сообщение об ошибке
                 StellarMessageBox.warning(self, self.tr("Error"), self.tr("Incorrect password!"))
         except RuntimeError:
-            # Если объект уже удален, просто выходим из метода
+            # Якщо об'єкт вже видалено
             return
+        except Exception as e:
+            print(f"[unlock_screen] unexpected error: {e}")
+            return
+
 
 
     def update_progress(self):
@@ -1030,21 +1433,41 @@ class MacOSWindow(QMainWindow):
     
 
     def load_background_image(self):
-        """Загрузка фонового изображения для всего приложения"""
+        """Завантажує фон робочого столу з desk.config (JSON)"""
+        import json, os
+
         try:
-            with open(self.desk_config, "r", encoding="utf-8") as f:
-                image_path = f.read().strip()
-            
-            if os.path.exists(image_path):
-                pixmap = QPixmap(image_path).scaled(
-                    self.size(), 
-                    Qt.AspectRatioMode.KeepAspectRatioByExpanding,
-                    Qt.TransformationMode.SmoothTransformation
-                )
-                self.background.setPixmap(pixmap)
-                self.background.setGeometry(0, 0, self.width(), self.height())
+            # Шлях до файлу конфігурації
+            config_path = self.desk_config if hasattr(self, "desk_config") else os.path.join("root", "user", "desk", "desk.config")
+
+            if not os.path.exists(config_path):
+                return  # нічого не робимо, якщо конфігу немає
+
+            with open(config_path, "r", encoding="utf-8") as f:
+                try:
+                    data = json.load(f)
+                except json.JSONDecodeError:
+                    print("[load_background_image] Помилка JSON — перевір формат desk.config")
+                    return
+
+            # Отримуємо шлях до шпалер
+            image_path = data.get("wallpaper_path")
+            if not image_path or not os.path.exists(image_path):
+                # fallback: стандартний фон
+                image_path = os.path.join("bin", "icons", "local_icons", "IconOs", "wallpaper.jpg")
+
+            # Встановлюємо зображення
+            pixmap = QPixmap(image_path).scaled(
+                self.size(),
+                Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            self.background.setPixmap(pixmap)
+            self.background.setGeometry(0, 0, self.width(), self.height())
+
         except Exception as e:
-            pass
+            print(f"[load_background_image] Помилка: {e}")
+
 
 
     def switch_to_next_window(self):
@@ -1059,21 +1482,6 @@ class MacOSWindow(QMainWindow):
         
         self.switch_window(next_window_name)
         self.active_window_name = next_window_name
-
-    # def create_all_windows(self):
-    #     """
-    #     Инициализация окон. Окна создаются только при первом открытии.
-    #     """
-    #     self.open_windows = {
-    #         "browser": None,
-    #         "cmd": None,
-    #         "settings": None,
-    #         "calc": None,
-    #         "explorer": None,
-    #         "notebook": None,
-    #         "Vscode": None,
-    #         "app_store": None
-    #     }
 
     def create_all_windows(self):
         """
@@ -1123,59 +1531,6 @@ class MacOSWindow(QMainWindow):
                 "app_store": None
             }
 
-
-    # def create_menu(self):
-    #     """
-    #     Создает меню с использованием QMenuBar и добавляет время/дату в правый угол.
-    #     """
-    #     menubar = self.menuBar()
-    #     menubar.setObjectName("main_menu_bar")
-
-    #     # Меню "Win" (динамически изменяет название на активное окно)
-    #     self.win_menu = menubar.addMenu("Win")
-    #     self.update_win_menu("desktop")
-
-    #     # Меню "Power" (Выключение и перезагрузка)
-    #     power_menu = menubar.addMenu(self.tr("Power"))
-
-    #     # Действие для выключения
-    #     shutdown_action = QAction(self.tr("Shutdown"), self)
-    #     shutdown_action.triggered.connect(self.shutdown_system)
-    #     power_menu.addAction(shutdown_action)
-
-    #     # Действие для перезагрузки
-    #     reboot_action = QAction(self.tr("Reboot"), self)
-    #     reboot_action.triggered.connect(self.reboot_system)
-    #     power_menu.addAction(reboot_action)
-
-    #     # Действие для блокировки экрана
-    #     lock_action = QAction(self.tr("Lock"), self)  # Кнопка блокировки
-    #     lock_action.triggered.connect(self.lock_screen)  # Связываем с методом блокировки
-    #     power_menu.addAction(lock_action)  # Добавляем в меню "Power"
-        
-    #     # Добавляем разделитель
-    #     power_menu.addSeparator()
-        
-    #     # Действие для закрытия приложения
-    #     quit_action = QAction(self.tr("Quit"), self)
-    #     # quit_action.setShortcut("Ctrl+Q")  # Горячая клавиша
-    #     quit_action.triggered.connect(self.close)  # Закрываем главное окно
-    #     power_menu.addAction(quit_action)
-
-    #     # Создание метки для времени и даты
-    #     self.time_label = QLabel()
-    #     self.time_label.setFont(QFont("Helvetica", 14))
-    #     self.time_label.setStyleSheet("color: black; padding: 5px;")
-    #     # self.update_time()  # Обновляем сразу при старте
-    #     self.create_wifi_button()
-
-    #     # Создание таймера для обновления времени
-    #     self.timer = QTimer(self)
-    #     self.timer.timeout.connect(self.update_time)
-    #     self.timer.start(1000)  # Обновление каждую секунду
-
-    #     # Добавление времени в правый угол меню
-    #     menubar.setCornerWidget(self.time_label, Qt.Corner.TopRightCorner)
     def create_menu(self):
         """
         Создает меню с использованием QMenuBar и добавляет время/дату в правый угол.
@@ -1489,9 +1844,31 @@ class MacOSWindow(QMainWindow):
             self.current_layout_label = None
 
     def create_start_menu(self):
-        """Створює меню 'Пуск' у стилі Windows 10 з пошуком і динамічною висотою"""
+        """Створює меню 'Пуск' з пошуком і можливістю закріплення застосунків (⭐).
+        Підвантажує закріплені додатки з dock.config і показує їх у док-панелі."""
         all_apps = self.get_available_apps()
 
+        # --- Зчитуємо pinned apps з dock.config (як у create_dock_panel) ---
+        try:
+            dock_config_path = files.get("dock.config", os.path.join("root", "bin", "dock.config"))
+        except Exception:
+            dock_config_path = os.path.join("root", "bin", "dock.config")
+
+        self.pinned_apps = set()
+        try:
+            with open(dock_config_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#"):
+                        self.pinned_apps.add(line)
+        except FileNotFoundError:
+            # Якщо немає файлу — просто залишаємо порожній набір
+            self.pinned_apps = set()
+        except Exception as e:
+            print(f"[START MENU] Error reading dock.config: {e}")
+            self.pinned_apps = set()
+
+        # --- Створюємо віджет меню ---
         self.start_menu = QWidget(self)
         self.start_menu.setObjectName("win10StartMenu")
         self.start_menu.setFixedWidth(400)
@@ -1509,8 +1886,8 @@ class MacOSWindow(QMainWindow):
         # Пошук
         self.search_box = Input(
             parent=self,
-            translator=self.tr,  # Передаем функцию перевода из MacOSWindow
-            lang_code=self.current_language  # Передаем текущий язык
+            translator=self.tr,
+            lang_code=getattr(self, "current_language", "en")
         )
         self.search_box.setPlaceholderText("Пошук...")
         self.search_box.setStyleSheet("""
@@ -1529,23 +1906,31 @@ class MacOSWindow(QMainWindow):
         all_apps_label.setStyleSheet("color: white; font-size: 14px; margin-top: 10px;")
         left_layout.addWidget(all_apps_label)
 
-        # Список застосунків
+        # Список застосунків (з прокруткою)
         apps_scroll = QScrollArea()
         apps_scroll.setWidgetResizable(True)
         apps_scroll.setStyleSheet("background: transparent; border: none;")
         apps_scroll.setVerticalScrollBar(CastScrollBar(Qt.Orientation.Vertical))
         apps_scroll.setHorizontalScrollBar(CastScrollBar(Qt.Orientation.Horizontal))
-        
+
         self.apps_widget = QWidget()
         self.apps_list_layout = QVBoxLayout(self.apps_widget)
         self.apps_list_layout.setSpacing(5)
+        self.apps_list_layout.setContentsMargins(0, 0, 0, 0)
 
-        self.app_buttons = []  # Зберігаємо кнопки для фільтрації
+        self.app_buttons = []  # зберігаємо для фільтрації
 
+        # --- Створюємо кнопки застосунків ---
         for app in all_apps:
-            btn = QPushButton(app["name"])
-            btn.setIcon(QIcon(app["icon"]))
-            btn.setIconSize(QSize(40, 40))
+            app_id = app.get("id", app.get("name"))
+            app_name = app.get("name", str(app_id))
+            app_icon = app.get("icon", "")
+
+            # Основна кнопка запуску
+            btn = QPushButton(app_name)
+            if app_icon:
+                btn.setIcon(QIcon(app_icon))
+                btn.setIconSize(QSize(40, 40))
             btn.setStyleSheet("""
                 QPushButton {
                     text-align: left;
@@ -1560,33 +1945,154 @@ class MacOSWindow(QMainWindow):
                     border-radius: 5px;
                 }
             """)
-            btn.clicked.connect(lambda _, a=app["id"]: self.handle_app_launch(a))
-            self.apps_list_layout.addWidget(btn)
-            self.app_buttons.append((btn, app["name"].lower()))
+            btn.clicked.connect(lambda _, a=app_id: self.handle_app_launch(a))
+
+            # Зірочка — кнопка "Закріпити"
+            is_pinned = app_id in self.pinned_apps
+            star_btn = QPushButton("★" if is_pinned else "☆")
+            star_btn.setFixedSize(26, 26)
+            star_btn.setStyleSheet("""
+                QPushButton {
+                    color: gold;
+                    background: transparent;
+                    font-size: 18px;
+                    border: none;
+                }
+                QPushButton:hover {
+                    color: yellow;
+                }
+            """)
+
+            # --- Обробник натискання на зірку ---
+            def make_toggle(a, s):
+                def toggle_pin():
+                    if not hasattr(self, "pinned_apps"):
+                        self.pinned_apps = set()
+
+                    # --- Закрепить / открепить ---
+                    was_pinned = a in self.pinned_apps
+                    if was_pinned:
+                        self.pinned_apps.remove(a)
+                        s.setText("☆")
+                        try:
+                            self.remove_from_dock(a)
+                        except Exception as e:
+                            print(f"[START MENU] remove_from_dock error: {e}")
+                    else:
+                        self.pinned_apps.add(a)
+                        s.setText("★")
+                        try:
+                            self.add_to_dock(a)
+                        except Exception as e:
+                            print(f"[START MENU] add_to_dock error: {e}")
+
+                    # --- Сохраняем новый список в dock.config ---
+                    try:
+                        dock_path = files.get("dock.config", os.path.join("root", "bin", "dock.config"))
+                    except Exception:
+                        dock_path = os.path.join("root", "bin", "dock.config")
+
+                    try:
+                        with open(dock_path, "w", encoding="utf-8") as f:
+                            for pid in sorted(self.pinned_apps):
+                                f.write(pid + "\n")
+                    except Exception as e:
+                        print(f"[START MENU] Error saving dock.config: {e}")
+
+                    # --- 🔄 Обновляем док-панель независимо от того, добавили или убрали ---
+                    try:
+                        self.refresh_dock_panel()
+                    except Exception as e:
+                        print(f"[START MENU] Error refreshing dock: {e}")
+                return toggle_pin
+
+
+            star_btn.clicked.connect(make_toggle(app_id, star_btn))
+
+            # Контейнер для кнопки застосунку + зірочки
+            row = QWidget()
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(0, 0, 0, 0)
+            row_layout.setSpacing(6)
+            row_layout.addWidget(btn)
+            row_layout.addWidget(star_btn)
+            self.apps_list_layout.addWidget(row)
+
+            # зберігаємо кнопку для пошуку (зберігаємо також row щоб приховувати повністю)
+            self.app_buttons.append((row, app_name.lower()))
 
         apps_scroll.setWidget(self.apps_widget)
         left_layout.addWidget(apps_scroll)
         layout.addWidget(left_panel, 2)
 
-        # Додаємо пошук
+        # --- Пошук по додатках ---
         def filter_apps():
             text = self.search_box.text().lower()
-            for btn, name in self.app_buttons:
-                btn.setVisible(text in name)
-
-            # Оновлюємо висоту меню під видимі кнопки
+            for row, name in self.app_buttons:
+                row.setVisible(text in name)
             self.update_start_menu_height()
 
         self.search_box.textChanged.connect(filter_apps)
 
-        # Підрахунок початкової висоти
+        # --- Налаштування висоти ---
         self.start_menu.setFixedHeight(self.calculate_start_menu_height(len(all_apps)))
         self.start_menu.move(0, self.height() - self.start_menu.height())
         self.start_menu.hide()
         self.start_menu.is_showing = False
-        # Фільтр подій для закриття при кліку поза меню
+
+        # Закриття при кліку поза меню
         self.start_menu.installEventFilter(self)
         QApplication.instance().installEventFilter(self)
+
+        # --- Додаємо вже закріплені додатки в док (щоб відобразити їх на панелі) ---
+        # Викликаємо add_to_dock лише після того, як док ініціалізовано (create_dock_panel)
+        try:
+            for pid in list(self.pinned_apps):
+                try:
+                    self.add_to_dock(pid)
+                except Exception:
+                    # якщо док ще не створений — ігноруємо, док створиться пізніше і зчитає dock.config
+                    pass
+        except Exception as e:
+            print(f"[START MENU] Error adding pinned apps to dock: {e}")
+
+
+    def add_to_dock(self, app_id):
+        """Додає додаток на док-панель"""
+        if app_id not in self.dynamic_dock_buttons:
+            self._add_dock_button(app_id)
+            print(f"[DOCK] {app_id} закріплено")
+
+    # def remove_from_dock(self, app_id):
+    #     """Видаляє додаток із док-панелі"""
+    #     if app_id in self.dynamic_dock_buttons:
+    #         btn = self.dynamic_dock_buttons.pop(app_id)
+    #         self.dock_layout.removeWidget(btn)
+    #         btn.deleteLater()
+    #         print(f"[DOCK] {app_id} відкріплено")
+
+    def save_pinned_apps(self):
+        """Зберігає закріплені програми у dock.config"""
+        try:
+            dock_config_path = files.get("dock.config", os.path.join("root", "bin", "dock.config"))
+            with open(dock_config_path, "w", encoding="utf-8") as f:
+                for app in sorted(self.pinned_apps):
+                    f.write(app + "\n")
+            print(f"[DOCK] Збережено {len(self.pinned_apps)} закріплених програм")
+        except Exception as e:
+            print(f"[DOCK] Помилка при збереженні dock.config: {e}")
+
+
+    def remove_from_dock(self, app_id):
+        """Удаляет одно приложение из док-панели"""
+        if app_id in self.dynamic_dock_buttons:
+            btn = self.dynamic_dock_buttons.pop(app_id)
+            self.dock_layout.removeWidget(btn)
+            btn.deleteLater()
+            print(f"[DOCK] {app_id} откреплено")
+        # сразу подчищаем лишние отступы
+        self.dock_layout.update()
+
 
     def handle_app_launch(self, app_id):
         """Обработчик запуска приложения"""
@@ -1726,7 +2232,11 @@ class MacOSWindow(QMainWindow):
         # Показываем экран блокировки
         if self.lock_widget is not None:
             self.lock_widget.show()
-            self.password_input.setFocus()  # Активируем поле ввода пароля
+            # self.password_input.setFocus()  # Активируем поле ввода пароля
+            if hasattr(self, "password_input") and self.password_input is not None:
+                self.password_input.setFocus()
+            elif hasattr(self, "login_button") and self.login_button is not None:
+                self.login_button.setFocus()
 
             # Анимация появления экрана блокировки сверху вниз
             self.animation = QPropertyAnimation(self.lock_widget, b"geometry")
@@ -1806,23 +2316,44 @@ class MacOSWindow(QMainWindow):
 
 
     def create_wifi_button(self):
-        """Создает кнопку Wi-Fi в правом нижнем углу"""
-        # Создаем контейнер для кнопки
+        """Создает кнопку Wi-Fi с возможностью настройки позиции и размера через widgets.json"""
+        import os, json
+
+        config_path = os.path.join("bin", "sys", "path", "widgets.json")
+        config = {}
+
+        # Загружаем конфиг
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    config = json.load(f)
+            except Exception as e:
+                print(f"[create_wifi_button] Ошибка чтения widgets.json: {e}")
+
+        # Получаем параметры кнопки
+        wifi_cfg = config.get("wifi_button", {})
+        btn_x = wifi_cfg.get("x", self.width() - 260)
+        btn_y = wifi_cfg.get("y", self.height() - 65)
+        btn_w = wifi_cfg.get("width", 60)
+        btn_h = wifi_cfg.get("height", 60)
+
+        if btn_y < 0:
+            btn_y = self.height() + btn_y  # Считаем от нижнего края
+
+        # === Контейнер ===
         self.wifi_button_container = QWidget(self)
-        self.wifi_button_container.setFixedSize(60, 60)
-        self.wifi_button_container.move(
-            self.width() - 260,  # Позиция слева от кнопки громкости
-            self.height() - 65   # Такая же высота как у других кнопок
-        )
-        
-        # Вертикальный лэйаут для кнопки
+        self.wifi_button_container.setFixedSize(btn_w, btn_h)
+        self.wifi_button_container.move(btn_x, btn_y)
+
+        # === Лэйаут ===
         layout = QVBoxLayout(self.wifi_button_container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        
-        # Создаем кнопку
+
+        # === Кнопка ===
         self.wifi_button = QPushButton()
-        self.wifi_button.setFixedSize(60, 60)
+        self.wifi_button.setFixedSize(btn_w, btn_h)
+        self.wifi_button.setObjectName("wifi_button")
         self.wifi_button.setStyleSheet("""
             QPushButton {
                 background-color: rgba(255, 255, 255, 0.25);
@@ -1834,34 +2365,47 @@ class MacOSWindow(QMainWindow):
                 background-color: rgba(255, 255, 255, 0.35);
             }
         """)
-        
-        # Иконка Wi-Fi
+
+        # === Иконка Wi-Fi ===
         self.wifi_icon = QLabel(self.wifi_button)
-        self.wifi_icon.setPixmap(QIcon(os.path.join("bin", "icons", "local_icons", "system", "wifi", "wifi_signal_4.png")).pixmap(30, 30))
         self.wifi_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.wifi_icon.setGeometry(15, 15, 30, 30)
-        
+
+        def update_wifi_icon_size():
+            icon_size = min(btn_w, btn_h) * 0.65  # Іконка займає 55% кнопки
+            pixmap = QIcon(
+                os.path.join("bin", "icons", "local_icons", "system", "wifi", "wifi_signal_4.png")
+            ).pixmap(int(icon_size), int(icon_size))
+            self.wifi_icon.setPixmap(pixmap)
+            self.wifi_icon.setGeometry(
+                int((btn_w - icon_size) / 2),
+                int((btn_h - icon_size) / 2),
+                int(icon_size),
+                int(icon_size)
+            )
+
+        update_wifi_icon_size()
         layout.addWidget(self.wifi_button)
-        
-        # Создаем виджет Wi-Fi (изначально скрыт)
+
+        # === Виджет Wi-Fi ===
         self.wifi_window = WifiWindow(
             parent=self,
-            translator=self.tr,  # Передаем функцию перевода из MacOSWindow
-            lang_code=self.current_language  # Передаем текущий язык
+            translator=self.tr,
+            lang_code=self.current_language
         )
         self.wifi_window.setParent(self)
         self.wifi_window.setObjectName("wifi_window")
         self.wifi_window.hide()
-        
-        # Подключаем клик по кнопке Wi-Fi
-        self.wifi_button.clicked.connect(self.toggle_wifi_control)
-        
-        # Добавляем эффект тени
+
+        # === Тень ===
         shadow = QGraphicsDropShadowEffect()
         shadow.setBlurRadius(20)
         shadow.setColor(QColor(0, 0, 0, 150))
         shadow.setOffset(0, 4)
         self.wifi_window.setGraphicsEffect(shadow)
+
+        # === Сигнал ===
+        self.wifi_button.clicked.connect(self.toggle_wifi_control)
+
 
     def toggle_wifi_control(self):
         """Показывает/скрывает панель управления Wi-Fi"""
@@ -1977,6 +2521,55 @@ class MacOSWindow(QMainWindow):
         self.dock.setLayout(self.dock_layout)
         self.main_layout.addWidget(self.dock, alignment=Qt.AlignmentFlag.AlignHCenter)
 
+    def refresh_dock_panel(self):
+        """Полностью пересоздаёт док-панель, чтобы соответствовать текущему dock.config"""
+        try:
+            dock_config_path = files.get("dock.config", os.path.join("root", "bin", "dock.config"))
+        except Exception:
+            dock_config_path = os.path.join("root", "bin", "dock.config")
+
+        # --- Удаляем ВСЕ кнопки из панели ---
+        for i in reversed(range(self.dock_layout.count())):
+            item = self.dock_layout.itemAt(i)
+            widget = item.widget()
+            if widget:
+                self.dock_layout.removeWidget(widget)
+                widget.deleteLater()
+
+        self.dock_buttons.clear()
+        self.dynamic_dock_buttons.clear()
+
+        # --- Перечитываем конфиг ---
+        self.allowed_apps = []
+        try:
+            with open(dock_config_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#"):
+                        self.allowed_apps.append(line)
+        except FileNotFoundError:
+            print(f"[DOCK] Конфигурация {dock_config_path} не найдена. Используются стандартные приложения.")
+        except Exception as e:
+            print(f"[DOCK] Ошибка при чтении файла конфигурации: {e}")
+
+        # --- Если файл пустой, показываем cmd ---
+        if not self.allowed_apps:
+            self.allowed_apps = ["cmd"]
+
+        # --- Добавляем кнопки заново ---
+        for app_name in self.allowed_apps:
+            try:
+                self._add_dock_button(app_name)
+            except Exception as e:
+                print(f"[DOCK] Ошибка при добавлении {app_name}: {e}")
+
+        # --- Обновляем панель ---
+        self.dock_layout.update()
+        print(f"[DOCK] Панель обновлена ({len(self.allowed_apps)} приложений).")
+
+
+
+
     def update_time(self):
         """
         Обновляет время и дату в метке.
@@ -2002,35 +2595,45 @@ class MacOSWindow(QMainWindow):
             self.open_windows[window_name].show()
 
     def _add_dock_button(self, app_name):
-        """Добавляет кнопку в док-панель"""
+        """Добавляет кнопку в док-панель (автоматический расчет размера иконок по dock_height)"""
+        import os, json
+
         if app_name in self.dock_buttons:
             return  # Кнопка уже существует
 
-        button_size = 44  # Размер кнопки
-        
-        # Пути к иконке приложения (пробуем несколько вариантов)
+        # === Загружаем настройки из widgets.json ===
+        config_path = os.path.join("bin", "sys", "path", "widgets.json")
+        dock_height = 45  # минимальная высота панели
+
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    dock_height = max(45, min(data.get("dock_height", 45), 65))
+            except Exception as e:
+                print(f"[_add_dock_button] Ошибка чтения widgets.json: {e}")
+
+        # === Автоматический расчет размера иконок ===
+        # при 45 → иконка 30, при 65 → иконка 44
+        button_size = int(30 + (dock_height - 45) * (44 - 30) / (65 - 45))
+        button_size = max(30, min(button_size, 44))
+
+        # === Пути к иконке приложения ===
         possible_icon_paths = [
             os.path.join("apps", "local", app_name, f"{app_name}.png"),
             os.path.join("apps", "local", f"{app_name}.png"),
             os.path.join("apps", "local", app_name, "icon.png")
         ]
-        
-        icon_path = None
-        for path in possible_icon_paths:
-            if os.path.exists(path):
-                icon_path = path
-                break
-        
+        icon_path = next((p for p in possible_icon_paths if os.path.exists(p)), None)
         if not icon_path:
             print(f"Иконка для {app_name} не найдена по путям: {possible_icon_paths}")
             return
 
+        # === Создаем кнопку ===
         btn = JumpingButton(icon_path=icon_path, parent=self)
         btn.setFixedSize(button_size, button_size)
-        btn.setIconSize(QSize(50, 50))
+        btn.setIconSize(QSize(button_size, button_size))
         btn.clicked.connect(lambda _, n=app_name: self.switch_window(n))
-        
-        # Устанавливаем прозрачный фон для кнопки
         btn.setStyleSheet("""
             QPushButton {
                 background-color: transparent;
@@ -2044,20 +2647,21 @@ class MacOSWindow(QMainWindow):
             }
         """)
 
-        # Добавляем эффект тени для кнопки
+        # === Эффект тени ===
         btn_shadow = QGraphicsDropShadowEffect()
         btn_shadow.setBlurRadius(10)
         btn_shadow.setColor(QColor(0, 0, 0, 100))
         btn_shadow.setOffset(2, 2)
         btn.setGraphicsEffect(btn_shadow)
 
+        # === Индикатор активности ===
         indicator = QLabel()
         indicator.setFixedSize(20, 4)
         indicator.setStyleSheet("background: transparent; border: none; border-radius: 2px;")
 
-        # Контейнер для кнопки и индикатора
+        # === Контейнер для кнопки и индикатора ===
         container = QWidget()
-        container.setStyleSheet("background: transparent;")  # Прозрачный фон контейнера
+        container.setStyleSheet("background: transparent;")
         container_layout = QVBoxLayout(container)
         container_layout.setContentsMargins(0, 8, 0, 0)
         container_layout.setSpacing(5)
@@ -2066,12 +2670,15 @@ class MacOSWindow(QMainWindow):
 
         self.dock_layout.addWidget(container)
         self.dock_buttons[app_name] = (btn, indicator)
-        
-        # Обновляем размер дока
-        dock_padding = 20  # Отступы док-панели
-        dock_spacing = 15  # Промежуток между кнопками
+
+        # === Автоматический расчет ширины панели ===
+        dock_padding = 20
+        dock_spacing = 15
         dock_width = len(self.dock_buttons) * (button_size + dock_spacing) + dock_padding * 2
-        self.dock.setFixedSize(dock_width, 65)
+
+        # === Применяем рассчитанную высоту панели ===
+        self.dock.setFixedSize(dock_width, dock_height)
+
             
     def switch_window(self, window_name):
         window_name = window_name.strip()
@@ -2165,36 +2772,47 @@ class MacOSWindow(QMainWindow):
         self.animation.start()
 
     def _add_dynamic_dock_button(self, app_name):
-        """Добавляет временную кнопку в док-панель для нестандартных приложений"""
+        """Добавляет временную кнопку в док-панель с автоподстройкой размера под dock_height"""
+        import os, json
+
         if app_name in self.dynamic_dock_buttons:
             return  # Кнопка уже существует
 
-        button_size = 44  # Размер кнопки
-        
-        # Пути к иконке приложения (пробуем несколько вариантов)
+        # === Загружаем настройки из widgets.json ===
+        config_path = os.path.join("bin", "sys", "path", "widgets.json")
+        dock_height = 45  # минимум
+
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    dock_height = max(45, min(data.get("dock_height", 45), 65))
+            except Exception as e:
+                print(f"[_add_dynamic_dock_button] Ошибка чтения widgets.json: {e}")
+
+        # === Автоматический расчет размера кнопки ===
+        # при 45 → 30, при 65 → 44
+        button_size = int(30 + (dock_height - 45) * (44 - 30) / (65 - 45))
+        button_size = max(30, min(button_size, 44))
+
+        # === Пути к иконке ===
         possible_icon_paths = [
             os.path.join("apps", "local", app_name, f"{app_name}.png"),
             os.path.join("apps", "local", f"{app_name}.png"),
             os.path.join("apps", "local", app_name, "icon.png"),
-            os.path.join("bin", "icons", "local_icons", "system", "default_app.png")  # Иконка по умолчанию
+            os.path.join("bin", "icons", "local_icons", "system", "default_app.png")
         ]
-        
-        icon_path = None
-        for path in possible_icon_paths:
-            if os.path.exists(path):
-                icon_path = path
-                break
-        
+        icon_path = next((p for p in possible_icon_paths if os.path.exists(p)), None)
         if not icon_path:
             print(f"Иконка для {app_name} не найдена по путям: {possible_icon_paths}")
             return
 
+        # === Кнопка ===
         btn = JumpingButton(icon_path=icon_path, parent=self)
         btn.setFixedSize(button_size, button_size)
-        btn.setIconSize(QSize(50, 50))
+        btn.setIconSize(QSize(button_size, button_size))
         btn.clicked.connect(lambda _, n=app_name: self.switch_window(n))
-        
-        # Устанавливаем прозрачный фон для кнопки
+
         btn.setStyleSheet("""
             QPushButton {
                 background-color: transparent;
@@ -2208,20 +2826,21 @@ class MacOSWindow(QMainWindow):
             }
         """)
 
-        # Добавляем эффект тени для кнопки
+        # === Эффект тени ===
         btn_shadow = QGraphicsDropShadowEffect()
         btn_shadow.setBlurRadius(10)
         btn_shadow.setColor(QColor(0, 0, 0, 100))
         btn_shadow.setOffset(2, 2)
         btn.setGraphicsEffect(btn_shadow)
 
+        # === Индикатор активности ===
         indicator = QLabel()
         indicator.setFixedSize(20, 4)
         indicator.setStyleSheet("background: transparent; border: none; border-radius: 2px;")
 
-        # Контейнер для кнопки и индикатора
+        # === Контейнер ===
         container = QWidget()
-        container.setStyleSheet("background: transparent;")  # Прозрачный фон контейнера
+        container.setStyleSheet("background: transparent;")
         container_layout = QVBoxLayout(container)
         container_layout.setContentsMargins(0, 8, 0, 0)
         container_layout.setSpacing(5)
@@ -2230,26 +2849,46 @@ class MacOSWindow(QMainWindow):
 
         self.dock_layout.addWidget(container)
         self.dynamic_dock_buttons[app_name] = (btn, indicator)
-        
-        # Обновляем размер дока
-        dock_padding = 20  # Отступы док-панели
-        dock_spacing = 15  # Промежуток между кнопками
+
+        # === Пересчет ширины панели ===
+        dock_padding = 20
+        dock_spacing = 15
         dock_width = (len(self.dock_buttons) + len(self.dynamic_dock_buttons)) * (button_size + dock_spacing) + dock_padding * 2
-        self.dock.setFixedSize(dock_width, 65)
 
-
+        # === Применяем рассчитанную высоту панели ===
+        self.dock.setFixedSize(dock_width, dock_height)
 
     def update_dock_indicators(self):
         """
         Обновляет индикаторы запущенных приложений в доке.
+        Автоматически подстраивает размер панели и кнопок по dock_height.
         """
+        import os, json
+
         if not hasattr(self, 'active_windows'):
             self.active_windows = {}
-            
-        # Сначала собираем список окон для удаления
+
+        # === Загружаем dock_height из widgets.json ===
+        config_path = os.path.join("bin", "sys", "path", "widgets.json")
+        dock_height = 45  # минимальная высота панели
+
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    dock_height = max(45, min(data.get("dock_height", 45), 65))
+            except Exception as e:
+                print(f"[update_dock_indicators] Ошибка чтения widgets.json: {e}")
+
+        # === Автоматический расчет размера кнопок ===
+        # при 45 → 30, при 65 → 44
+        button_size = int(30 + (dock_height - 45) * (44 - 30) / (65 - 45))
+        button_size = max(30, min(button_size, 44))
+
+        # === Список окон для удаления ===
         windows_to_remove = []
-        
-        # Обновляем индикаторы для стандартных кнопок
+
+        # === Обновляем индикаторы для стандартных кнопок ===
         for window_name, (button, indicator) in self.dock_buttons.items():
             window = self.open_windows.get(window_name)
             if window is not None and not window.isHidden():  # Окно открыто и не скрыто
@@ -2272,20 +2911,20 @@ class MacOSWindow(QMainWindow):
                     background-color: transparent;
                     border: none;
                 """)
-        
-        # Обработка динамических кнопок
+
+        # === Обработка динамических кнопок ===
         for window_name, (button, indicator) in self.dynamic_dock_buttons.items():
             window = self.open_windows.get(window_name)
             if window is None:  # Окно полностью закрыто
                 windows_to_remove.append(window_name)
-            elif not window.isHidden():  # Окно открыто и не скрыто
+            elif not window.isHidden():  # Окно открыто
                 indicator.setStyleSheet("""
                     background-color: #4bcfff;
                     border: none;
                     border-radius: 22px;
                     min-height: 4px;
                 """)
-            elif window.minimized:  # Окно свернуто
+            elif window.minimized:  # Свернуто
                 indicator.setStyleSheet("""
                     background-color: #4bcfff;
                     border: none;
@@ -2293,21 +2932,22 @@ class MacOSWindow(QMainWindow):
                     min-height: 4px;
                     opacity: 0.5;
                 """)
-        
-        # Удаляем кнопки для закрытых окон
+
+        # === Удаляем кнопки закрытых окон ===
         for window_name in windows_to_remove:
             if window_name in self.dynamic_dock_buttons:
                 container = self.dynamic_dock_buttons[window_name][0].parent()
                 self.dock_layout.removeWidget(container)
                 container.deleteLater()
                 del self.dynamic_dock_buttons[window_name]
-                
-        # Обновляем размер дока
-        button_size = 44
+
+        # === Пересчет ширины и высоты панели ===
         dock_padding = 20
         dock_spacing = 15
         dock_width = (len(self.dock_buttons) + len(self.dynamic_dock_buttons)) * (button_size + dock_spacing) + dock_padding * 2
-        self.dock.setFixedSize(dock_width, 65)
+
+        self.dock.setFixedSize(dock_width, dock_height)
+
 
 
 
@@ -2316,8 +2956,39 @@ from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineSettings
 from PyQt6.QtCore import QTimer
 
-# В функцию main, перед созданием главного окна
+
+# --- Проверка статуса установки ---
+def check_installation_status():
+    install_file = "root/dataLacmi/user/install"
+    if not os.path.exists(install_file):
+        print("[ERROR] Файл установки не найден:", install_file)
+        return False
+    try:
+        with open(install_file, "r", encoding="utf-8") as f:
+            status = f.read().strip().lower()
+        if status == "yes":
+            return True
+        else:
+            print("[INFO] Приложение не установлено (install != yes). Запуск отменён.")
+            return False
+    except Exception as e:
+        print(f"[ERROR] Ошибка чтения файла установки: {e}")
+        return False
+
+
+
+from bin.sys.class_.creat_user import SetupWizard
+
+
+# --- Основная функция ---
 if __name__ == "__main__":
+    if not check_installation_status():
+        app = QApplication(sys.argv)
+        setup = SetupWizard()
+        setup.show()
+        sys.exit(app.exec())
+
+
     # Устанавливаем глобальный обработчик исключений
     sys.excepthook = global_exception_handler
 
@@ -2325,48 +2996,23 @@ if __name__ == "__main__":
         app = QApplication(sys.argv)
         
         # ПРЕДВАРИТЕЛЬНАЯ ИНИЦИАЛИЗАЦИЯ QWebEngineView ДЛЯ УСКОРЕНИЯ ЗАПУСКА
-        # Создаем и сразу скрываем WebEngineView для предзагрузки движка
         print("Preloading QWebEngineView...")
         preload_webengine = QWebEngineView()
         preload_webengine.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, True)
         preload_webengine.settings().setAttribute(QWebEngineSettings.WebAttribute.PlaybackRequiresUserGesture, False)
-        
-        # Загружаем пустую страницу для инициализации
         preload_webengine.setHtml("<html><body><p>Loading...</p></body></html>")
-        
-        # Скрываем и удаляем через короткое время
         QTimer.singleShot(100, preload_webengine.deleteLater)
-        
-        # Обрабатываем события для завершения инициализации
         QApplication.processEvents()
         
+        # Создаём и показываем основное окно
         window = MacOSWindow()
         window.show()
 
         # Таймер для проверки зависания
         timer = QTimer()
-        timer.timeout.connect(lambda: None)  # Пустая функция для проверки отклика
-        timer.start(1000)  # Проверка каждую секунду
+        timer.timeout.connect(lambda: None)
+        timer.start(1000)
 
         sys.exit(app.exec())
     except Exception as e:
-        # Если ошибка произошла до создания окна, показываем её в DeathScreen через временное окно
         global_exception_handler(type(e), e, e.__traceback__)
-# if __name__ == "__main__":
-#     # Устанавливаем глобальный обработчик исключений
-#     sys.excepthook = global_exception_handler
-
-#     try:
-#         app = QApplication(sys.argv)
-#         window = MacOSWindow()
-#         window.show()
-
-#         # Таймер для проверки зависания
-#         timer = QTimer()
-#         timer.timeout.connect(lambda: None)  # Пустая функция для проверки отклика
-#         timer.start(1000)  # Проверка каждую секунду
-
-#         sys.exit(app.exec())
-#     except Exception as e:
-#         # Если ошибка произошла до создания окна, показываем её в DeathScreen через временное окно
-#         global_exception_handler(type(e), e, e.__traceback__)

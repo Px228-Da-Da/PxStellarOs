@@ -14,35 +14,32 @@
 def install_dependencies():
     import subprocess
     import sys
-
-    # 🔹 Полный список библиотек, которые нужны твоему проекту
-    required_packages = [
-        # PyQt
-        "PyQt6",
-        "PyQt6-WebEngine",
-
-        # Сеть, обновления и системные вещи
-        "requests",
-        "pywifi",
-
-        # Аудио
-        "pycaw",
-        "comtypes",
-        "pulsectl",
-
-        # Архивация, служебные модули
-        "zipfile36",  # если zipfile встроен — pip просто проигнорирует
-        "hmac",       # стандартная библиотека, тоже пропустится
-
-        # Дополнительные зависимости проекта
-        "pillow",     # часто нужно для работы с изображениями
-    ]
+    import platform
 
     print("🔍 Проверка установленных библиотек...\n")
 
+    # 🔹 Основные зависимости для всех систем
+    base_packages = [
+        "PyQt6",
+        "PyQt6-WebEngine",
+        "requests",
+        "pywifi",
+        "pillow",
+        "pycaw",
+        "comtypes"
+    ]
+
+    # 🔹 Только для Linux
+    linux_packages = ["pulsectl"]
+
+    # 🔹 Объединяем нужные пакеты
+    required_packages = base_packages.copy()
+    if platform.system() == "Linux":
+        required_packages += linux_packages
+
     for package in required_packages:
         try:
-            __import__(package.replace("-", "_"))  # заменяем дефис на подчёркивание для импорта
+            __import__(package.replace("-", "_"))
             print(f"✅ {package} уже установлено.")
         except ImportError:
             print(f"⬇ Устанавливаю {package} ...")
@@ -54,8 +51,6 @@ def install_dependencies():
 
     print("\n✅ Проверка зависимостей завершена.\n")
 
-
-# --- Автоматически вызываем при запуске ---
 install_dependencies()
 
 
@@ -90,7 +85,7 @@ from PyQt6.QtWidgets import (
     QApplication, QScrollArea, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QFrame, QPushButton,
     QLabel, QMessageBox, QStackedWidget, QMenuBar, QToolBar, QLineEdit, QTabWidget, QMenu, QPlainTextEdit,
     QTextEdit, QCalendarWidget, QListWidget, QListWidgetItem, QProgressBar, QGridLayout, 
-    QGraphicsDropShadowEffect, QSlider, QFileDialog, QInputDialog, QComboBox, QDialog, QGroupBox, QCheckBox
+    QGraphicsDropShadowEffect, QSlider, QFileDialog, QInputDialog, QComboBox, QDialog, QGroupBox, QCheckBox, QSpinBox, QSizePolicy, QFormLayout
 )
 
 from PyQt6.QtWebEngineWidgets import QWebEngineView

@@ -933,8 +933,6 @@ class MacOSWindow(QMainWindow):
             log_path = os.path.join("root", "user", "desk", "lock_debug.log")
 
             def log(msg):
-                with open(log_path, "a", encoding="utf-8") as f:
-                    f.write(f"{msg}\n")
                 print(msg)
 
             desk_config_path = os.path.join("root", "user", "desk", "desk.config")
@@ -2947,6 +2945,129 @@ class MacOSWindow(QMainWindow):
         dock_width = (len(self.dock_buttons) + len(self.dynamic_dock_buttons)) * (button_size + dock_spacing) + dock_padding * 2
 
         self.dock.setFixedSize(dock_width, dock_height)
+
+
+    def reload_widgets(self):
+        """Перезавантажує системні елементи без перезапуску ОС"""
+        try:
+            config_path = os.path.join("bin", "sys", "path", "widgets.json")
+            if not os.path.exists(config_path):
+                print("[reload_widgets] Файл widgets.json не знайдено.")
+                return
+
+            with open(config_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            # === TIME BUTTON ===
+            if hasattr(self, "time_button_container") and self.time_button_container:
+                cfg = data.get("time_button", {})
+                x = cfg.get("x", 1245)
+                y = cfg.get("y", -60)
+                w = cfg.get("width", 120)
+                h = cfg.get("height", 45)
+
+                if y < 0:
+                    y = self.height() + y
+
+                self.time_button_container.setGeometry(x, y, w, h)
+                self.time_button.setFixedSize(w, h)
+                self.time_button_container.show()
+                self.time_button.show()
+                print("[reload_widgets] TIME BUTTON оновлено.")
+
+            # === START BUTTON ===
+            cfg = data.get("start_button", {})
+            x = cfg.get("x", 0)
+            y = cfg.get("y", -60)
+            w = cfg.get("width", 45)
+            h = cfg.get("height", 45)
+
+            if y < 0:
+                y = self.height() + y
+
+            target = None
+            if hasattr(self, "start_button_container"):
+                target = self.start_button_container
+            elif hasattr(self, "start_button"):
+                target = self.start_button
+            elif hasattr(self, "dock_start_container"):
+                target = self.dock_start_container
+
+            if target:
+                target.setGeometry(x, y, w, h)
+                try:
+                    if hasattr(self, "start_button"):
+                        self.start_button.setFixedSize(w, h)
+                        self.start_button.show()
+                except Exception:
+                    pass
+                target.show()
+                print("[reload_widgets] START BUTTON оновлено.")
+            else:
+                print("[reload_widgets] START BUTTON не знайдено у вікні.")
+
+            # === WIFI BUTTON ===
+            cfg = data.get("wifi_button", {})
+            x = cfg.get("x", 1123)
+            y = cfg.get("y", -60)
+            w = cfg.get("width", 45)
+            h = cfg.get("height", 45)
+
+            if y < 0:
+                y = self.height() + y
+
+            wifi_target = None
+            if hasattr(self, "wifi_button_container"):
+                wifi_target = self.wifi_button_container
+            elif hasattr(self, "wifi_button"):
+                wifi_target = self.wifi_button
+
+            if wifi_target:
+                wifi_target.setGeometry(x, y, w, h)
+                try:
+                    if hasattr(self, "wifi_button"):
+                        self.wifi_button.setFixedSize(w, h)
+                        self.wifi_button.show()
+                except Exception:
+                    pass
+                wifi_target.show()
+                print("[reload_widgets] WIFI BUTTON оновлено.")
+            else:
+                print("[reload_widgets] WIFI BUTTON не знайдено у вікні.")
+
+            # === VOLUME BUTTON ===
+            cfg = data.get("volume_button", {})
+            x = cfg.get("x", 1179)
+            y = cfg.get("y", -60)
+            w = cfg.get("width", 45)
+            h = cfg.get("height", 45)
+
+            if y < 0:
+                y = self.height() + y
+
+            vol_target = None
+            if hasattr(self, "volume_button_container"):
+                vol_target = self.volume_button_container
+            elif hasattr(self, "volume_button"):
+                vol_target = self.volume_button
+
+            if vol_target:
+                vol_target.setGeometry(x, y, w, h)
+                try:
+                    if hasattr(self, "volume_button"):
+                        self.volume_button.setFixedSize(w, h)
+                        self.volume_button.show()
+                except Exception:
+                    pass
+                vol_target.show()
+                print("[reload_widgets] VOLUME BUTTON оновлено.")
+            else:
+                print("[reload_widgets] VOLUME BUTTON не знайдено у вікні.")
+
+            print("[reload_widgets] ✅ Усі віджети оновлено і відображено.")
+
+        except Exception as e: 
+            print(f"[reload_widgets] ❌ Помилка: {e}")
 
 
 

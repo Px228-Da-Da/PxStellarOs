@@ -34,7 +34,7 @@ class YoutubemusicWindow(DraggableResizableWindow):
         self.lang_code = lang_code
 
         self.setWindowTitle(self.tr("YouTube Music"))
-        self.setGeometry(300, 150, 1000, 700)
+        self.setGeometry(100, 100, 800, 700)
 
         # Создаём центральный виджет для layout
         self.container = QWidget(self)  # <- это будет "центральный" виджет

@@ -1032,25 +1032,63 @@ class SettingsWindow(DraggableResizableWindow):
             )
             self.update_button.setEnabled(False)
 
+    # def backup_current_version(self):
+    #     backup_dir = "backup"
+    #     try:
+    #         if not os.path.exists(backup_dir):
+    #             os.makedirs(backup_dir)
+    #         for item in os.listdir("."):
+    #             if item not in [backup_dir, ".venv"] and not item.startswith('.'):
+    #                 src_path = os.path.join(".", item)
+    #                 dst_path = os.path.join(backup_dir, item)
+    #                 if os.path.isdir(src_path):
+    #                     shutil.copytree(src_path, dst_path, symlinks=True, dirs_exist_ok=True)
+    #                 else:
+    #                     shutil.copy2(src_path, dst_path)
+    #         return True
+    #     except Exception as e:
+    #         print(f"Backup error: {e}")
+    #         StellarMessageBox.critical(self, self.tr("Backup error"),
+    #                                    self.tr(f"Failed to create backup:\n{str(e)}"))
+    #         return False
     def backup_current_version(self):
         backup_dir = "backup"
         try:
             if not os.path.exists(backup_dir):
                 os.makedirs(backup_dir)
+
             for item in os.listdir("."):
                 if item != backup_dir and not item.startswith('.'):
                     src_path = os.path.join(".", item)
                     dst_path = os.path.join(backup_dir, item)
+
                     if os.path.isdir(src_path):
-                        shutil.copytree(src_path, dst_path, symlinks=True, dirs_exist_ok=True)
+                        # 🔹 Копіюємо директорію без помилок при існуванні файлів
+                        shutil.copytree(
+                            src_path,
+                            dst_path,
+                            symlinks=True,
+                            dirs_exist_ok=True,  # ✅ дозволяє існуючі файли
+                            ignore=shutil.ignore_patterns("*.pyc", "__pycache__")
+                        )
                     else:
-                        shutil.copy2(src_path, dst_path)
+                        # 🔹 Якщо файл уже існує — пропускаємо
+                        try:
+                            shutil.copy2(src_path, dst_path)
+                        except FileExistsError:
+                            pass
+
             return True
+
         except Exception as e:
             print(f"Backup error: {e}")
-            StellarMessageBox.critical(self, self.tr("Backup error"),
-                                       self.tr(f"Failed to create backup:\n{str(e)}"))
+            StellarMessageBox.critical(
+                self,
+                self.tr("Backup error"),
+                f"{self.tr('Failed to create backup')}:\n{str(e)}"
+            )
             return False
+
 
     def rollback_update(self):
         backup_dir = "backup"

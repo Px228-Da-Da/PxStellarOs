@@ -219,9 +219,9 @@ class WifiWindow(QWidget):
         return int((signal + 90) / 60 * 100)
 
     def connect_to_selected_network(self, item):
-        if not self.iface:
-            StellarMessageBox.warning(self, self.tr("Error"), self.tr("Wi-Fi adapter not found"))
-            return
+        # if not self.iface:
+        #     StellarMessageBox.warning(self, self.tr("Error"), self.tr("Wi-Fi adapter not found"))
+        #     return
             
         ssid = item.text().split(" (")[0]
         saved_password = self.password_manager.get_password(ssid)

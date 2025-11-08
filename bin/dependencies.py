@@ -1,168 +1,17 @@
-def ensure_console_dependencies():
-    """
-    Проверяет наличие библиотек, необходимых для работы ConsoleScreen (PyQt6),
-    и автоматически устанавливает их при отсутствии.
-    """
-    import importlib.util
-    import subprocess
-    import sys
-    import time
-
-    required = ["PyQt6"]
-
-    print("🔍 Проверка библиотек, необходимых для запуска ConsoleScreen...\n")
-    time.sleep(0.8)
-
-    for package in required:
-        if importlib.util.find_spec(package) is None:
-            print(f"⬇ Не найдена {package}, выполняю установку...")
-            time.sleep(0.7)
-            try:
-                subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-                print(f"✅ {package} установлена успешно!")
-                time.sleep(0.5)
-            except Exception as e:
-                print(f"❌ Ошибка при установке {package}: {e}")
-                time.sleep(3)
-                sys.exit(1)
-        else:
-            print(f"✅ {package} уже установлена.")
-            time.sleep(0.4)
-
-    print("✅ Все зависимости для ConsoleScreen готовы.\n")
-    time.sleep(1.2)
-
-ensure_console_dependencies()
-
-from PyQt6.QtWidgets import QApplication, QWidget, QTextEdit, QVBoxLayout
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QTextCursor
-import sys, ctypes, traceback
-
-class ConsoleScreen(QWidget):
-    """Повноекранний чорний екран для показу системних логів і помилок."""
-    instance = None
-
-    def __init__(self):
-        super().__init__()
-        ConsoleScreen.instance = self  # глобальна ссилка
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
-        self.showFullScreen()
-        self.setStyleSheet("""
-            background-color: black;
-            color: white;
-            font-family: Consolas;
-            font-size: 14px;
-        """)
-
-        layout = QVBoxLayout(self)
-        self.console = QTextEdit()
-        self.console.setReadOnly(True)
-        self.console.setStyleSheet("background-color: black; color: white; border: none;")
-        layout.addWidget(self.console)
-
-        # Перенаправляємо stdout/stderr
-        sys.stdout = self
-        sys.stderr = self
-
-        # Ховаємо консоль Windows (cmd)
-        try:
-            ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), 0)
-        except Exception:
-            pass
-
-    def write(self, text):
-        cursor = self.console.textCursor()
-        cursor.movePosition(QTextCursor.MoveOperation.End)
-        self.console.setTextCursor(cursor)
-        self.console.insertPlainText(text)
-        self.console.moveCursor(QTextCursor.MoveOperation.End)
-        self.console.ensureCursorVisible()
-        self.console.repaint()
-        from PyQt6.QtWidgets import QApplication
-        QApplication.processEvents()  # ✅ обновление GUI в реальном времени
-
-
-    def flush(self):
-        pass
-
-    @staticmethod
-    def show_error(message: str):
-        """Показує помилку на екрані, навіть якщо ОС не завантажилась."""
-        if ConsoleScreen.instance:
-            ConsoleScreen.instance.write(f"\n❌ CRITICAL ERROR:\n{message}\n")
-        else:
-            # fallback у випадку, якщо екран ще не створено
-            print(f"\n❌ CRITICAL ERROR:\n{message}\n")
-
 # === Проверка и установка зависимостей ===
-# def install_dependencies():
-#     """
-#     Проверяет и при необходимости устанавливает все зависимости для ОС.
-#     """
-#     import subprocess
-#     import sys
-#     import platform
-#     import time
-
-#     print("🔍 Проверка установленных библиотек...\n")
-#     sys.stdout.flush()
-#     time.sleep(0.5)
-
-#     base_packages = [
-#         "PyQt6",
-#         "PyQt6-WebEngine",
-#         "requests",
-#         "pywifi",
-#         "pillow",
-#         "pycaw",
-#         "comtypes",
-#         "psutil"
-#     ]
-
-#     linux_packages = ["pulsectl"]
-
-#     required_packages = base_packages.copy()
-#     if platform.system() == "Linux":
-#         required_packages += linux_packages
-
-#     for package in required_packages:
-#         try:
-#             __import__(package.replace("-", "_"))
-#             print(f"✅ {package} уже установлено.")
-#             sys.stdout.flush()
-#             time.sleep(0.3)
-#         except ImportError:
-#             print(f"⬇ Устанавливаю {package} ...")
-#             sys.stdout.flush()
-#             time.sleep(0.5)
-#             try:
-#                 subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-#                 print(f"✅ {package} установлено успешно!\n")
-#                 sys.stdout.flush()
-#                 time.sleep(0.4)
-#             except Exception as e:
-#                 print(f"❌ Не удалось установить {package}: {e}\n")
-#                 sys.stdout.flush()
-#                 time.sleep(0.8)
-
-#     print("\n✅ Проверка зависимостей завершена.\n")
-#     sys.stdout.flush()
-#     time.sleep(1.0)
 
 def install_dependencies():
     """
     Проверяет и при необходимости устанавливает все зависимости для ОС.
-    Показывает весь реальный вывод pip в ConsoleScreen.
     """
     import subprocess
     import sys
     import platform
     import time
 
-    print("🔍 Проверка установленных библиотек...\n")
+    print("[CHECK] Проверка установленных библиотек...\n")
     sys.stdout.flush()
-    time.sleep(0.8)
+    time.sleep(0.5)
 
     base_packages = [
         "PyQt6",
@@ -174,6 +23,7 @@ def install_dependencies():
         "comtypes",
         "psutil"
     ]
+
     linux_packages = ["pulsectl"]
 
     required_packages = base_packages.copy()
@@ -183,47 +33,40 @@ def install_dependencies():
     for package in required_packages:
         try:
             __import__(package.replace("-", "_"))
-            print(f"✅ {package} уже установлено.")
+            print(f"[YES] {package} уже установлено.")
             sys.stdout.flush()
-            time.sleep(0.4)
+            time.sleep(0.3)
         except ImportError:
-            print(f"⬇ Устанавливаю {package} ...")
+            print(f"[INSTALL] Устанавливаю {package} ...")
             sys.stdout.flush()
-            time.sleep(0.6)
+            time.sleep(0.5)
             try:
-                # 🔹 потоковое чтение вывода pip install
-                process = subprocess.Popen(
-                    [sys.executable, "-m", "pip", "install", package, "--upgrade"],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    bufsize=1
-                )
-                for line in process.stdout:
-                    print(line, end="")  # вывод каждой строки прямо в ConsoleScreen
-                    sys.stdout.flush()
-
-                process.wait()
-
-                if process.returncode == 0:
-                    print(f"✅ {package} установлено успешно!\n")
-                else:
-                    print(f"❌ Ошибка при установке {package} (код {process.returncode})\n")
-
+                subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+                print(f"[YES] {package} установлено успешно!\n")
                 sys.stdout.flush()
-                time.sleep(0.5)
-
+                time.sleep(0.4)
             except Exception as e:
-                print(f"❌ Не удалось установить {package}: {e}\n")
+                print(f"[ERROR] Не удалось установить {package}: {e}\n")
                 sys.stdout.flush()
-                time.sleep(1.0)
+                time.sleep(0.8)
 
-    print("\n✅ Проверка зависимостей завершена.\n")
-    sys.stdout.flush()
-    time.sleep(1.0)
+    print("\n[YES] Проверка зависимостей завершена.\n")
 
-# install_dependencies()
 
+import sys, os
+os.system("chcp 65001 >nul")
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
+
+install_dependencies()
+
+# | Символ  | Заміна      |
+# | ------  | ----------- |
+# | 🔍      | `[CHECK]`   |
+# | ⬇       | `[INSTALL] ` |
+# | ✅      | `[OK]`      |
+# | ❌      | `[ERROR]`   |
 
 
 import subprocess

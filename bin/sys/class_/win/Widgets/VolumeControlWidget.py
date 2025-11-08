@@ -103,6 +103,12 @@ class VolumeControlWidget(QWidget):
         main_layout.addWidget(self.volume_label)
 
         self.update_volume()
+                # === Автоматическое обновление громкости ===
+        from PyQt6.QtCore import QTimer
+        self.refresh_timer = QTimer(self)
+        self.refresh_timer.timeout.connect(self.update_volume)
+        self.refresh_timer.start(500)  # обновляем каждые 0.5 секунды
+
 
     def paintEvent(self, event):
         """Рисуем закруглённый фон"""

@@ -42,12 +42,12 @@ QPushButton.reboot_button::icon {
 
 /* Метки з часом і датою */
 QLabel#time_button_time {
-    color: white;
+    color: black;
     font-size: 14px;
     font-weight: bold;
 }
 QLabel#time_button_date {
-    color: white;
+    color: black;
     font-size: 14px;
 }
 

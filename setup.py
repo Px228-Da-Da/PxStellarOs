@@ -529,14 +529,91 @@ class MacOSWindow(QMainWindow):
         # === Обработчик клика ===
         self.start_button.clicked.connect(self.toggle_start_menu)
 
+    # def create_volume_button(self):
+    #     """Создает кнопку громкости с возможностью настройки размера и позиции через widgets.json"""
+    #     import os, json
+
+    #     config_path = os.path.join("bin", "sys", "path", "widgets.json")
+    #     config = {}
+
+    #     # Загружаем конфиг
+    #     if os.path.exists(config_path):
+    #         try:
+    #             with open(config_path, "r", encoding="utf-8") as f:
+    #                 config = json.load(f)
+    #         except Exception as e:
+    #             print(f"[create_volume_button] Ошибка чтения widgets.json: {e}")
+
+    #     # Получаем параметры кнопки
+    #     volume_cfg = config.get("volume_button", {})
+    #     btn_x = volume_cfg.get("x", self.width() - 190)
+    #     btn_y = volume_cfg.get("y", self.height() - 65)
+    #     btn_w = volume_cfg.get("width", 60)
+    #     btn_h = volume_cfg.get("height", 60)
+
+    #     if btn_y < 0:
+    #         btn_y = self.height() + btn_y  # Считаем от нижнего края
+
+    #     # === Контейнер ===
+    #     self.volume_button_container = QWidget(self)
+    #     self.volume_button_container.setFixedSize(btn_w, btn_h)
+    #     self.volume_button_container.move(btn_x, btn_y)
+
+    #     # === Лэйаут ===
+    #     layout = QVBoxLayout(self.volume_button_container)
+    #     layout.setContentsMargins(0, 0, 0, 0)
+    #     layout.setSpacing(0)
+
+    #     # === Кнопка ===
+    #     self.volume_button = QPushButton()
+    #     self.volume_button.setFixedSize(btn_w, btn_h)
+    #     self.volume_button.setObjectName("volume_button")
+
+    #     # === Иконка ===
+    #     self.volume_icon = QLabel(self.volume_button)
+    #     self.volume_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+    #     # --- динамічне оновлення іконки при зміні розміру ---
+    #     def update_icon_size():
+    #         icon_size = min(btn_w, btn_h) * 0.65  # Іконка займає ~55% кнопки
+    #         pixmap = QIcon(
+    #             os.path.join("bin", "icons", "local_icons", "system", "volume.png")
+    #         ).pixmap(int(icon_size), int(icon_size))
+    #         self.volume_icon.setPixmap(pixmap)
+    #         self.volume_icon.setGeometry(
+    #             int((btn_w - icon_size) / 2),
+    #             int((btn_h - icon_size) / 2),
+    #             int(icon_size),
+    #             int(icon_size)
+    #         )
+
+
+    #     update_icon_size()
+
+    #     layout.addWidget(self.volume_button)
+
+    #     # === Виджет громкости ===
+    #     self.volume_widget = VolumeControlWidget(
+    #         parent=self,
+    #         translator=self.tr,
+    #         lang_code=self.current_language
+    #     )
+    #     self.volume_widget.setParent(self)
+    #     self.volume_widget.hide()
+
+    #     # === Сигналы ===
+    #     self.volume_button.clicked.connect(self.toggle_volume_control)
+
+    #     # === Таймер ===
+    #     self.volume_timer = QTimer(self)
+    #     self.volume_timer.timeout.connect(self.update_volume_icon)
+    #     self.volume_timer.start(1000)
     def create_volume_button(self):
-        """Создает кнопку громкости с возможностью настройки размера и позиции через widgets.json"""
+        """Создает кнопку громкости с управлением колесиком мыши и отображением процента"""
         import os, json
 
         config_path = os.path.join("bin", "sys", "path", "widgets.json")
         config = {}
-
-        # Загружаем конфиг
         if os.path.exists(config_path):
             try:
                 with open(config_path, "r", encoding="utf-8") as f:
@@ -544,7 +621,6 @@ class MacOSWindow(QMainWindow):
             except Exception as e:
                 print(f"[create_volume_button] Ошибка чтения widgets.json: {e}")
 
-        # Получаем параметры кнопки
         volume_cfg = config.get("volume_button", {})
         btn_x = volume_cfg.get("x", self.width() - 190)
         btn_y = volume_cfg.get("y", self.height() - 65)
@@ -552,14 +628,13 @@ class MacOSWindow(QMainWindow):
         btn_h = volume_cfg.get("height", 60)
 
         if btn_y < 0:
-            btn_y = self.height() + btn_y  # Считаем от нижнего края
+            btn_y = self.height() + btn_y
 
         # === Контейнер ===
         self.volume_button_container = QWidget(self)
         self.volume_button_container.setFixedSize(btn_w, btn_h)
         self.volume_button_container.move(btn_x, btn_y)
 
-        # === Лэйаут ===
         layout = QVBoxLayout(self.volume_button_container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -573,9 +648,8 @@ class MacOSWindow(QMainWindow):
         self.volume_icon = QLabel(self.volume_button)
         self.volume_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # --- динамічне оновлення іконки при зміні розміру ---
         def update_icon_size():
-            icon_size = min(btn_w, btn_h) * 0.65  # Іконка займає ~55% кнопки
+            icon_size = min(btn_w, btn_h) * 0.65
             pixmap = QIcon(
                 os.path.join("bin", "icons", "local_icons", "system", "volume.png")
             ).pixmap(int(icon_size), int(icon_size))
@@ -587,9 +661,7 @@ class MacOSWindow(QMainWindow):
                 int(icon_size)
             )
 
-
         update_icon_size()
-
         layout.addWidget(self.volume_button)
 
         # === Виджет громкости ===
@@ -598,16 +670,72 @@ class MacOSWindow(QMainWindow):
             translator=self.tr,
             lang_code=self.current_language
         )
-        self.volume_widget.setParent(self)
         self.volume_widget.hide()
 
-        # === Сигналы ===
         self.volume_button.clicked.connect(self.toggle_volume_control)
+
+        # === Надпись с громкостью (появляется при наведении) ===
+        self.volume_label = QLabel(self)
+        self.volume_label.setText("100%")
+        self.volume_label.setStyleSheet("""
+            QLabel {
+                background-color: rgba(30, 30, 30, 190);
+                color: #ffffff;
+                font-weight: 600;
+                font-size: 11px;
+                border-radius: 6px;
+                padding: 2px 6px;
+            }
+        """)
+        self.volume_label.hide()
+
+        def show_volume_label():
+            """Показывает процент громкости при наведении"""
+            vol = int(self.volume_widget.get_current_volume())
+            self.volume_label.setText(f"{vol}%")
+            label_x = btn_x + btn_w/2 - self.volume_label.width()/2
+            label_y = btn_y - 25
+            self.volume_label.move(int(label_x), int(label_y))
+            self.volume_label.adjustSize()
+            self.volume_label.show()
+
+        def hide_volume_label():
+            """Скрывает процент при уходе курсора"""
+            self.volume_label.hide()
+
+        # === Прокрутка колеса мыши ===
+        def wheelEvent(event):
+            delta = event.angleDelta().y()
+            if hasattr(self.volume_widget, "volume"):
+                current = self.volume_widget.get_current_volume() / 100.0
+                change = 0.05 if delta > 0 else -0.05
+                new_volume = max(0.0, min(1.0, current + change))
+                try:
+                    self.volume_widget.volume.SetMasterVolumeLevelScalar(new_volume, None)
+                except Exception as e:
+                    print(f"[VOLUME] Error setting volume: {e}")
+
+                # Обновляем UI
+                self.volume_widget.update_volume()
+                self.update_volume_icon()
+
+                # 🔸 обновляем текст процента (даже если мышь не ушла)
+                show_volume_label()
+
+                print(f"[VOLUME] Volume set to: {int(new_volume * 100)}%")
+
+        # Привязываем события
+        self.volume_button_container.enterEvent = lambda e: show_volume_label()
+        self.volume_button_container.leaveEvent = lambda e: hide_volume_label()
+        self.volume_button_container.wheelEvent = wheelEvent
+        self.volume_button.wheelEvent = wheelEvent
 
         # === Таймер ===
         self.volume_timer = QTimer(self)
         self.volume_timer.timeout.connect(self.update_volume_icon)
         self.volume_timer.start(1000)
+
+
 
 
     def toggle_volume_control(self):
@@ -3102,38 +3230,155 @@ from bin.sys.class_.creat_user import SetupWizard
 
 
 # --- Основная функция ---
+# if __name__ == "__main__":
+#     if not check_installation_status():
+#         app = QApplication(sys.argv)
+#         setup = SetupWizard()
+#         setup.show()
+#         sys.exit(app.exec())
+
+
+#     # Устанавливаем глобальный обработчик исключений
+#     sys.excepthook = global_exception_handler
+
+#     try:
+#         app = QApplication(sys.argv)
+        
+#         # ПРЕДВАРИТЕЛЬНАЯ ИНИЦИАЛИЗАЦИЯ QWebEngineView ДЛЯ УСКОРЕНИЯ ЗАПУСКА
+#         print("Preloading QWebEngineView...")
+#         preload_webengine = QWebEngineView()
+#         preload_webengine.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, True)
+#         preload_webengine.settings().setAttribute(QWebEngineSettings.WebAttribute.PlaybackRequiresUserGesture, False)
+#         preload_webengine.setHtml("<html><body><p>Loading...</p></body></html>")
+#         QTimer.singleShot(100, preload_webengine.deleteLater)
+#         QApplication.processEvents()
+        
+#         # Создаём и показываем основное окно
+#         window = MacOSWindow()
+#         window.show()
+
+#         # Таймер для проверки зависания
+#         timer = QTimer()
+#         timer.timeout.connect(lambda: None)
+#         timer.start(1000)
+
+#         sys.exit(app.exec())
+#     except Exception as e:
+#         global_exception_handler(type(e), e, e.__traceback__)
+
+# --- Основная функция ---
+# if __name__ == "__main__":
+#     from dependencies import ConsoleScreen  # Импортируем экран логов из dependencies.py
+
+#     app = QApplication(sys.argv)
+
+#     # 🔸 Создаём и показываем экран логов до всех операций
+#     console_screen = ConsoleScreen()
+#     console_screen.show()
+#     print("🔍 Проверка установленных библиотек...\n")
+
+#     try:
+#         # Проверяем установку зависимостей (всё выведется в ConsoleScreen)
+#         if not check_installation_status():
+#             setup = SetupWizard()
+#             setup.show()
+#             sys.exit(app.exec())
+
+#         # Глобальный обработчик исключений, который тоже пишет в экран
+#         def global_exception_handler(exc_type, exc_value, exc_traceback):
+#             import traceback
+#             error_text = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+#             ConsoleScreen.show_error(error_text)
+
+#         sys.excepthook = global_exception_handler
+
+#         print("Preloading QWebEngineView...")
+
+#         # ПРЕДВАРИТЕЛЬНАЯ ИНИЦИАЛИЗАЦИЯ QWebEngineView для ускорения запуска
+#         preload_webengine = QWebEngineView()
+#         preload_webengine.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, True)
+#         preload_webengine.settings().setAttribute(QWebEngineSettings.WebAttribute.PlaybackRequiresUserGesture, False)
+#         preload_webengine.setHtml("<html><body><p>Loading...</p></body></html>")
+#         QTimer.singleShot(100, preload_webengine.deleteLater)
+#         QApplication.processEvents()
+
+#         print("[BOOT] Создание основного окна...")
+#         window = MacOSWindow()
+#         window.show()
+
+#         # ⏳ Таймер для предотвращения зависаний
+#         timer = QTimer()
+#         timer.timeout.connect(lambda: None)
+#         timer.start(1000)
+
+#         # ✅ Когда всё загружено, закрываем экран логов
+#         QTimer.singleShot(2000, console_screen.close)
+
+#         sys.exit(app.exec_())
+
+#     except Exception as e:
+#         import traceback
+#         error_text = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+#         ConsoleScreen.show_error(error_text)
+#         # ❗ Не закрываем приложение — оставляем экран видимым
+#         app.exec()
+
+# --- Основная функция ---
 if __name__ == "__main__":
-    if not check_installation_status():
-        app = QApplication(sys.argv)
-        setup = SetupWizard()
-        setup.show()
-        sys.exit(app.exec())
+    from dependencies import ensure_console_dependencies, ConsoleScreen, install_dependencies
 
+    # ✅ Сначала проверяем зависимости для ConsoleScreen
+    ensure_console_dependencies()
 
-    # Устанавливаем глобальный обработчик исключений
-    sys.excepthook = global_exception_handler
+    # ✅ Создаём приложение и окно логов
+    app = QApplication(sys.argv)
+    console_screen = ConsoleScreen()
+    console_screen.show()
 
     try:
-        app = QApplication(sys.argv)
-        
-        # ПРЕДВАРИТЕЛЬНАЯ ИНИЦИАЛИЗАЦИЯ QWebEngineView ДЛЯ УСКОРЕНИЯ ЗАПУСКА
-        print("Preloading QWebEngineView...")
+        # 🔹 Теперь запускаем установку зависимостей — вывод пойдёт в окно ConsoleScreen
+        install_dependencies()
+
+        # 🔹 Проверяем статус установки ОС
+        if not check_installation_status():
+            setup = SetupWizard()
+            setup.show()
+            sys.exit(app.exec())
+
+        # 🔹 Глобальный обработчик исключений
+        def global_exception_handler(exc_type, exc_value, exc_traceback):
+            import traceback
+            error_text = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+            ConsoleScreen.show_error(error_text)
+
+        sys.excepthook = global_exception_handler
+
+        print("[BOOT] Preloading QWebEngineView...")
+
+        # 🔹 Предварительная инициализация QWebEngineView
         preload_webengine = QWebEngineView()
         preload_webengine.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, True)
         preload_webengine.settings().setAttribute(QWebEngineSettings.WebAttribute.PlaybackRequiresUserGesture, False)
         preload_webengine.setHtml("<html><body><p>Loading...</p></body></html>")
         QTimer.singleShot(100, preload_webengine.deleteLater)
         QApplication.processEvents()
-        
-        # Создаём и показываем основное окно
+
+        print("[BOOT] Creating main window...")
         window = MacOSWindow()
         window.show()
 
-        # Таймер для проверки зависания
+        # 🔹 Закрываем экран логов через 2 секунды после загрузки
+        # QTimer.singleShot(2000, console_screen.close)
+
+        # 🔹 Таймер для предотвращения зависаний
         timer = QTimer()
         timer.timeout.connect(lambda: None)
         timer.start(1000)
 
         sys.exit(app.exec())
+
     except Exception as e:
-        global_exception_handler(type(e), e, e.__traceback__)
+        import traceback
+        error_text = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+        ConsoleScreen.show_error(error_text)
+        app.exec()

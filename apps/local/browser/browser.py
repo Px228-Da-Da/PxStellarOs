@@ -11,6 +11,9 @@ from PyQt6.QtGui import QAction
 
 from PyQt6.QtGui import QPixmap
 
+import tempfile
+import shutil
+
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin")))
@@ -19,12 +22,55 @@ from dependencies import *
 BROWSER_DIR = os.path.dirname(os.path.abspath(__file__))
 # print(BROWSER_DIR)
 
+from PyQt6.QtWidgets import QMenu, QStyle, QProxyStyle
+from PyQt6.QtGui import QContextMenuEvent
+from PyQt6.QtCore import Qt
 
-class NoContextMenuWebEngineView(QWebEngineView):
+class CustomMenuStyle(QProxyStyle):
+    def drawControl(self, element, option, painter, widget=None):
+        if element == QStyle.ControlElement.CE_MenuItem:
+            option.palette.setColor(option.palette.ColorRole.Text, Qt.GlobalColor.white)
+        super().drawControl(element, option, painter, widget)
+
+class StyledWebEngineView(QWebEngineView):
     def __init__(self, parent=None):
         super().__init__(parent)
-        # Отключаем встроенное контекстное меню Chromium
-        self.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)
+        # Включаем стандартное контекстное меню Chromium
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.DefaultContextMenu)
+
+    def contextMenuEvent(self, event: QContextMenuEvent):
+        # ✅ Правильный способ в PyQt6
+        menu = self.createStandardContextMenu()
+
+        # === Кастомный стиль ===
+        menu.setStyle(CustomMenuStyle())
+        menu.setStyleSheet("""
+            QMenu {
+                background-color: #2b2b2b;
+                border: 1px solid #444;
+                border-radius: 8px;
+                padding: 6px;
+            }
+            QMenu::item {
+                color: #f0f0f0;
+                padding: 8px 18px;
+                border-radius: 6px;
+            }
+            QMenu::item:selected {
+                background-color: #3d6ddf;
+                color: white;
+            }
+            QMenu::separator {
+                height: 1px;
+                background: #555;
+                margin: 4px 8px;
+            }
+        """)
+
+        menu.exec(event.globalPos())
+        menu.deleteLater()
+
+
 
 class CustomWebEnginePage(QWebEnginePage):
     def __init__(self, profile, parent, browser_window):
@@ -35,6 +81,61 @@ class CustomWebEnginePage(QWebEnginePage):
     # Переопределяем метод: все window.open() будут сюда
     def createWindow(self, web_window_type):
         return self.browser_window.create_new_tab_from_page(web_window_type)
+    
+    def chooseFiles(self, mode, old_files, accepted_mime_types):
+        try:
+            parent_widget = self.parent()
+
+            if mode == QWebEnginePage.FileSelectionMode.FileSelectOpen:
+                file_path, _ = CustomFileDialog.getOpenFileName(
+                    parent_widget,
+                    "Select File",
+                    "root/user",
+                    "All Files (*);;Images (*.png *.jpg *.jpeg *.bmp *.webp)"
+                )
+                if not file_path:
+                    return []
+
+                # --- Копіюємо у системну тимчасову теку ---
+                temp_dir = tempfile.gettempdir()
+                temp_path = os.path.join(temp_dir, os.path.basename(file_path))
+                shutil.copy2(file_path, temp_path)
+                print(f"[BROWSER] Копіюємо {file_path} → {temp_path}")
+                return [temp_path]
+
+            elif mode == QWebEnginePage.FileSelectionMode.FileSelectOpenMultiple:
+                files, _ = CustomFileDialog.getOpenFileNames(
+                    parent_widget,
+                    "Select Files",
+                    "root/user",
+                    "All Files (*);;Images (*.png *.jpg *.jpeg *.bmp *.webp)"
+                )
+                temp_files = []
+                for f in files:
+                    temp_path = os.path.join(tempfile.gettempdir(), os.path.basename(f))
+                    shutil.copy2(f, temp_path)
+                    temp_files.append(temp_path)
+                return temp_files
+
+            elif mode == QWebEnginePage.FileSelectionMode.FileSelectSave:
+                file_path, _ = CustomFileDialog.getSaveFileName(
+                    parent_widget,
+                    "Save File As",
+                    "root/user",
+                    "All Files (*)"
+                )
+                if not file_path:
+                    return []
+
+                temp_path = os.path.join(tempfile.gettempdir(), os.path.basename(file_path))
+                return [temp_path]
+
+        except Exception as e:
+            print(f"[BROWSER] Помилка у CustomFileDialog: {e}")
+            return []
+
+        return []
+
 
 
 class BrowserWindow(DraggableResizableWindow):
@@ -562,7 +663,9 @@ class BrowserWindow(DraggableResizableWindow):
         if not isinstance(url, str):
             url = f"https://www.google.com/?hl={self.lang_code}"
 
-        browser = QWebEngineView()
+        # browser = QWebEngineView()
+        browser = StyledWebEngineView()
+
         # browser.setStyleSheet("background-color: #D1D1D1; ")
         browser.setStyleSheet("background-color: transparent; border: none;")
 

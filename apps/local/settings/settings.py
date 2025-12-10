@@ -200,7 +200,13 @@ class SettingsWindow(DraggableResizableWindow):
         password_layout.addWidget(title_label_pass)
 
         # Поле старого пароля
-        self.old_password_input = QLineEdit()
+        self.old_password_input = InputPassword(
+                parent=password_page,
+                placeholder_text=self.tr("Password"),
+                initial_text="",
+                echo_mode=QLineEdit.EchoMode.Password,
+                translator=self.tr
+            )
         self.old_password_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.old_password_input.setPlaceholderText(self.tr("Current password"))
         self.old_password_input.setMinimumHeight(32)
@@ -208,7 +214,13 @@ class SettingsWindow(DraggableResizableWindow):
         password_layout.addWidget(self.old_password_input)
 
         # Поле нового пароля
-        self.new_password_input = QLineEdit()
+        self.new_password_input = InputPassword(
+                parent=password_page,
+                placeholder_text=self.tr("Password"),
+                initial_text="",
+                echo_mode=QLineEdit.EchoMode.Password,
+                translator=self.tr
+            )
         self.new_password_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.new_password_input.setPlaceholderText(self.tr("New password"))
         self.new_password_input.setMinimumHeight(32)
@@ -339,7 +351,11 @@ class SettingsWindow(DraggableResizableWindow):
             lock_clock_sec = False
 
         def make_input(value):
-            field = QLineEdit(str(value))
+            field = Input(
+                parent=self,
+                initial_text="" if value is None else str(value),
+                translator=self.tr
+            )
             field.setFixedWidth(100)
             field.setStyleSheet("""
                 QLineEdit {
@@ -497,7 +513,11 @@ class SettingsWindow(DraggableResizableWindow):
             volume_data = {}
 
         def make_volume_input(value):
-            field = QLineEdit(str(value))
+            field = Input(
+                parent=self,
+                initial_text="" if value is None else str(value),
+                translator=self.tr
+            )
             field.setFixedWidth(100)
             field.setStyleSheet("""
                 QLineEdit {
@@ -601,7 +621,11 @@ class SettingsWindow(DraggableResizableWindow):
             wifi_data = {}
 
         def make_wifi_input(value):
-            field = QLineEdit(str(value))
+            field = Input(
+                parent=self,
+                initial_text="" if value is None else str(value),
+                translator=self.tr
+            )
             field.setFixedWidth(100)
             field.setStyleSheet("""
                 QLineEdit {
@@ -703,7 +727,11 @@ class SettingsWindow(DraggableResizableWindow):
             start_data = {}
 
         def make_input_start(value):
-            field = QLineEdit(str(value))
+            field = Input(
+                parent=self,
+                initial_text="" if value is None else str(value),
+                translator=self.tr
+            )
             field.setFixedWidth(100)
             field.setStyleSheet("""
                 QLineEdit {
@@ -810,7 +838,11 @@ class SettingsWindow(DraggableResizableWindow):
             top_offset = bottom_offset = left_offset = right_offset = 0
 
         def make_offset_input(value):
-            field = QLineEdit(str(value))
+            field = Input(
+                parent=self,
+                initial_text="" if value is None else str(value),
+                translator=self.tr
+            )
             field.setFixedWidth(100)
             field.setStyleSheet("""
                 QLineEdit {

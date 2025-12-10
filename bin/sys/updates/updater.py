@@ -130,7 +130,7 @@ def download_and_extract_zip(branch, destination):
 
 def update_files(source_folder, destination_folder):
     try:
-        files_to_update = ["apps", "bin", "root", "HittiScript", "version.txt", "updater.py", "setup.py"]
+        files_to_update = ["apps", "bin", "run.py", "setup.py"]
 
         for item in files_to_update:
             item_path = os.path.join(destination_folder, item)
@@ -178,6 +178,63 @@ def install_requirements():
         print(f"Неожиданная ошибка: {e}")
         return False
 
+# def update_application(branch="master"):
+#     try:
+#         if not os.path.exists(TEMP_FOLDER):
+#             os.makedirs(TEMP_FOLDER)
+
+#         if not download_and_extract_zip(branch, TEMP_FOLDER):
+#             return False
+
+#         extracted_folder = os.path.join(TEMP_FOLDER, f"PxStellarOs-{branch}")
+
+#         if not os.path.exists(extracted_folder):
+#             print(f"Ошибка: Папка {extracted_folder} не найдена после распаковки.")
+#             return False
+
+#         if not update_files(extracted_folder, os.getcwd()):
+#             return False
+
+#         # Устанавливаем зависимости после обновления файлов
+#         if not install_requirements():
+#             print("Предупреждение: Не удалось установить все зависимости")
+
+#         shutil.rmtree(TEMP_FOLDER)
+#         return True
+#     except Exception as e:
+#         print(f"Ошибка при обновлении приложения: {e}")
+#         return False
+def verify_update_files(temp_dir):
+    """
+    Перевіряє, чи архів з оновленням містить усі потрібні файли.
+    Виконує dry-run: перевіряє структуру, але не змінює систему.
+    """
+    required_files = ["run.py", "setup.py"]
+    extracted_folder = None
+
+    # Знаходимо розпаковану папку
+    for item in os.listdir(temp_dir):
+        if os.path.isdir(os.path.join(temp_dir, item)) and item.startswith("PxStellarOs"):
+            extracted_folder = os.path.join(temp_dir, item)
+            break
+
+    if not extracted_folder:
+        print("[DRY RUN] ❌ Не знайдено розпаковану папку оновлення.")
+        return False
+
+    missing = []
+    for f in required_files:
+        if not os.path.exists(os.path.join(extracted_folder, f)):
+            missing.append(f)
+
+    if missing:
+        print(f"[DRY RUN] ⚠ В архіві відсутні важливі файли: {', '.join(missing)}")
+        return False
+
+    print("[DRY RUN] ✅ Усі потрібні файли на місці.")
+    return True
+
+
 def update_application(branch="master"):
     try:
         if not os.path.exists(TEMP_FOLDER):
@@ -185,6 +242,15 @@ def update_application(branch="master"):
 
         if not download_and_extract_zip(branch, TEMP_FOLDER):
             return False
+
+        # === D R Y  R U N ===
+        print("[DRY RUN] Перевірка завантаженого оновлення...")
+        if not verify_update_files(TEMP_FOLDER):
+            print("[DRY RUN] ❌ Тест оновлення не пройшов. Оновлення скасовано.")
+            shutil.rmtree(TEMP_FOLDER)
+            return False
+        else:
+            print("[DRY RUN] ✅ Тест пройдено. Починаємо оновлення...")
 
         extracted_folder = os.path.join(TEMP_FOLDER, f"PxStellarOs-{branch}")
 
@@ -195,7 +261,6 @@ def update_application(branch="master"):
         if not update_files(extracted_folder, os.getcwd()):
             return False
 
-        # Устанавливаем зависимости после обновления файлов
         if not install_requirements():
             print("Предупреждение: Не удалось установить все зависимости")
 
@@ -204,6 +269,7 @@ def update_application(branch="master"):
     except Exception as e:
         print(f"Ошибка при обновлении приложения: {e}")
         return False
+
 
 def check_for_updates(branch="master"):
     current_version = get_current_version()

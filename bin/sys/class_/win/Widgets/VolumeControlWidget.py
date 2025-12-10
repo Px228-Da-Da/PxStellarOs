@@ -9,7 +9,7 @@ from PyQt6.QtCore import Qt, QRectF
 
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin")))
-from dependencies import *  # если нужно
+from dependencies import *
 
 class VolumeControlWidget(QWidget):
     def __init__(self, parent=None, translator=None, lang_code="en"):

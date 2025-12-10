@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QSize, QEvent
 from PyQt6.QtGui import QIcon, QPixmap
+from PyQt6.QtCore import Qt, QSize, QEvent, QThread, pyqtSignal
 
 
 import zipfile
@@ -18,24 +19,131 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin")))
 from dependencies import *
 
-class App_storeWindow(DraggableResizableWindow):
-    def __init__(self, parent=None, window_name="App Store", translator=None, lang_code="en"):
+class UpdatesCheckWorker(QThread):
+    result_ready = pyqtSignal(list)   # список оновлень: [(app_name, local_ver, remote_ver, download_url), ...]
+    error = pyqtSignal(str)
+
+    def __init__(self, config_path, parent=None):
+        super().__init__(parent)
+        self.config_path = config_path
+
+    def run(self):
+        import json, urllib.request, urllib.error
+
+        updates = []
+
+        def compare_versions(v1, v2):
+            def to_tuple(v):
+                try:
+                    return tuple(map(int, (v.split('.') + ['0', '0'])[:3]))
+                except Exception:
+                    return (0, 0, 0)
+            t1 = to_tuple(v1)
+            t2 = to_tuple(v2)
+            if t1 < t2:
+                return -1
+            if t1 > t2:
+                return 1
+            return 0
+
+        try:
+            if not os.path.exists(self.config_path):
+                self.result_ready.emit([])
+                return
+
+            with open(self.config_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            apps = [
+                line.split(":")[0].strip().strip('"')
+                for line in content.split(",")
+                if line.strip()
+            ]
+
+            for app_name in apps:
+                clean_name = app_name.replace(".None", "")
+                if clean_name.lower() == "app_store":
+                    continue
+
+                try:
+                    # локальна версія
+                    local_version_path = os.path.join("apps", "local", clean_name, "version.json")
+                    if not os.path.exists(local_version_path):
+                        continue
+
+                    with open(local_version_path, "r", encoding="utf-8") as f:
+                        local_data = json.load(f)
+
+                    local_version = local_data.get("version", "0.0.0")
+                    download_url = local_data.get("download_url", "")
+
+                    if "github.com" not in download_url:
+                        continue
+
+                    # формуємо посилання на raw version.json
+                    if download_url.endswith("/archive/refs/heads/main.zip"):
+                        repo_url = download_url.replace("/archive/refs/heads/main.zip", "")
+                    elif download_url.endswith("/archive/main.zip"):
+                        repo_url = download_url.replace("/archive/main.zip", "")
+                    else:
+                        continue
+
+                    raw_version_url = f"{repo_url}/raw/main/version.json"
+
+                    req = urllib.request.Request(
+                        raw_version_url,
+                        headers={"User-Agent": "Mozilla/5.0"}
+                    )
+
+                    with urllib.request.urlopen(req, timeout=10) as resp:
+                        if resp.status != 200:
+                            continue
+                        remote_data = json.loads(resp.read().decode("utf-8"))
+
+                    remote_version = remote_data.get("version", "0.0.0")
+
+                    if compare_versions(local_version, remote_version) < 0:
+                        # є оновлення
+                        updates.append(
+                            (clean_name, local_version, remote_version, download_url)
+                        )
+
+                except Exception as e:
+                    # не валимо весь потік через одну помилку
+                    print(f"[UpdatesCheckWorker] Error for {clean_name}: {e}")
+
+            self.result_ready.emit(updates)
+
+        except Exception as e:
+            self.error.emit(str(e))
+
+
+class Manager_allWindow(DraggableResizableWindow):
+    def __init__(self, parent=None, window_name="Manager", translator=None, lang_code="en"):
+        self.scroll_area = None
+        self.updates_scroll_area = None
+        self.apps_container = None
+        self.updates_container = None
+        self.apps_layout = None
+        self.updates_layout = None
         super().__init__(parent)
         self.parent_window = parent
         self.window_name = window_name
         self.lang_code = lang_code
         self.app_cards = []
+        self.update_worker = None
         self.card_width = 180  # Fixed card width
         self.card_height = 220  # Fixed card height
         self.spacing = 20  # Spacing between cards
 
         # Set window properties
-        self.setWindowTitle(self.tr("App Store"))
+        self.setWindowTitle(self.tr("Manager"))
         self.setGeometry(200, 100, 800, 600)
 
         # Create a container widget for our content
         self.container = QWidget()
         self.content_layout.addWidget(self.container)
+        self.setup_focus_activation(self.container)
 
         # Main layout - УСТАНОВИТЕ MARGINS И SPACING
         self.main_layout = QVBoxLayout(self.container)
@@ -170,12 +278,26 @@ class App_storeWindow(DraggableResizableWindow):
         self.scroll_area.installEventFilter(self)
 
     def eventFilter(self, obj, event):
-        """Handle resize events for both tabs"""
-        if obj == self.scroll_area and event.type() == QEvent.Type.Resize:
-            self.update_apps_layout()
-        elif obj == self.updates_scroll_area and event.type() == QEvent.Type.Resize:
-            self.update_updates_layout()
+        """Обробка resize для скролів + делегуємо базовому класу для активації вікна"""
+        if event.type() == QEvent.Type.Resize:
+            # Вкладка з локальними застосунками
+            if getattr(self, "scroll_area", None) is obj and self.apps_layout is not None:
+                try:
+                    self.update_apps_layout()
+                except Exception as e:
+                    print(f"[manager_all] update_apps_layout error: {e}")
+
+            # Вкладка з оновленнями
+            if getattr(self, "updates_scroll_area", None) is obj and self.updates_layout is not None:
+                try:
+                    self.update_updates_layout()
+                except Exception as e:
+                    print(f"[manager_all] update_updates_layout error: {e}")
+
+        # Дуже важливо: даємо базовому DraggableResizableWindow обробити подію,
+        # щоб клік по дитині активував вікно
         return super().eventFilter(obj, event)
+
 
 
     def update_apps_layout(self):
@@ -494,44 +616,104 @@ class App_storeWindow(DraggableResizableWindow):
                                   stop:0 #7c9fdb, stop:1 #6b8eca);
             }
         """)
-        self.check_updates_btn.clicked.connect(self.check_for_updates)
+        self.check_updates_btn.clicked.connect(self.start_check_updates)
+
         tab_layout.addWidget(self.check_updates_btn)
 
         # Установим обработчик изменения размера
         self.updates_scroll_area.installEventFilter(self)
 
+    def start_check_updates(self):
+        """Запускає перевірку оновлень в окремому потоці"""
+        if self.update_worker is not None and self.update_worker.isRunning():
+            # уже щось перевіряємо – не запускаємо вдруге
+            return
+
+        # блокуємо кнопку, показуємо статус
+        self.check_updates_btn.setEnabled(False)
+        self.check_updates_btn.setText(self.tr("Checking..."))
+
+        config_path = os.path.join("root", "bin", "install_apps.config")
+        self.update_worker = UpdatesCheckWorker(config_path, parent=self)
+        self.update_worker.result_ready.connect(self.on_updates_ready)
+        self.update_worker.error.connect(self.on_updates_error)
+        self.update_worker.finished.connect(self.on_updates_finished)
+        self.update_worker.start()
+
+    # Можеш залишити ім’я старого методу для сумісності
     def check_for_updates(self):
-        """Check for available updates for all installed apps"""
-        # print("=== Starting update check ===")
-        
-        # Clear previous update cards
+        """Старий публічний інтерфейс — тепер просто запускає асинхронну перевірку"""
+        self.start_check_updates()
+
+    def on_updates_ready(self, updates):
+        """Створює картки оновлень у головному потоці"""
+        # чистимо попередні картки
         for i in reversed(range(self.updates_layout.count())):
             widget = self.updates_layout.itemAt(i).widget()
             if widget:
                 widget.setParent(None)
-        
-        # Get list of installed apps
-        config_path = os.path.join("root", "bin", "install_apps.config")
-        
+
+        if not updates:
+            # Нема оновлень – можна показати лейбл
+            label = QLabel(self.tr("All apps are up to date."))
+            label.setStyleSheet("color: #ccc; font-size: 13px;")
+            self.updates_layout.addWidget(label, 0, 0)
+        else:
+            for app_name, local_ver, remote_ver, download_url in updates:
+                self.add_update_card(app_name, local_ver, remote_ver, download_url)
+
+        self.update_updates_layout()
+
+    def on_updates_error(self, message: str):
+        print(f"[Manager_allWindow] Update check error: {message}")
         try:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-                apps = [line.split(':')[0].strip().strip('"') for line in content.split(',') if line.strip()]
-                
-                # print(f"Found {len(apps)} installed apps")
-                
-                for app_name in apps:
-                    clean_name = app_name.replace('.None', '')
-                    if clean_name.lower() != "app_store":
-                        self.check_app_update(clean_name)
-                        
-            # Update layout after loading all update cards
-            self.update_updates_layout()
-                    
-        except Exception as e:
-            print(f"Error checking updates: {str(e)}")
+            StellarMessageBox.warning(
+                self,
+                self.tr("Error"),
+                self.tr("Failed to check for updates:\n{}").format(message)
+            )
+        except Exception:
+            pass
+
+    def on_updates_finished(self):
+        """Повертаємо кнопку в нормальний стан після завершення потоку"""
+        self.check_updates_btn.setEnabled(True)
+        self.check_updates_btn.setText(self.tr("Check for Updates"))
+        self.update_worker = None
+
+
+    # def check_for_updates(self):
+    #     """Check for available updates for all installed apps"""
+    #     # print("=== Starting update check ===")
         
-        # print("=== Update check completed ===")
+    #     # Clear previous update cards
+    #     for i in reversed(range(self.updates_layout.count())):
+    #         widget = self.updates_layout.itemAt(i).widget()
+    #         if widget:
+    #             widget.setParent(None)
+        
+    #     # Get list of installed apps
+    #     config_path = os.path.join("root", "bin", "install_apps.config")
+        
+    #     try:
+    #         with open(config_path, 'r', encoding='utf-8') as f:
+    #             content = f.read()
+    #             apps = [line.split(':')[0].strip().strip('"') for line in content.split(',') if line.strip()]
+                
+    #             # print(f"Found {len(apps)} installed apps")
+                
+    #             for app_name in apps:
+    #                 clean_name = app_name.replace('.None', '')
+    #                 if clean_name.lower() != "app_store":
+    #                     self.check_app_update(clean_name)
+                        
+    #         # Update layout after loading all update cards
+    #         self.update_updates_layout()
+                    
+    #     except Exception as e:
+    #         print(f"Error checking updates: {str(e)}")
+        
+    #     # print("=== Update check completed ===")
 
     def check_app_update(self, app_name):
         """Check if update is available for specific app"""
@@ -622,15 +804,20 @@ class App_storeWindow(DraggableResizableWindow):
         card.setFixedSize(self.card_width, self.card_height)
         card.setStyleSheet("""
             QWidget {
-                background-color: rgba(60, 50, 50, 200);
-                border-radius: 10px;
-                border: 1px solid #755;
+                background-color: rgba(40, 40, 40, 180);
+                border-radius: 12px;
             }
             QWidget:hover {
-                background-color: rgba(70, 60, 60, 220);
-                border: 1px solid #966;
+                background-color: rgba(50, 50, 50, 200);
             }
         """)
+
+        # Add subtle shadow effect
+        shadow = QGraphicsDropShadowEffect()
+        shadow.setBlurRadius(15)
+        shadow.setColor(QColor(0, 0, 0, 80))
+        shadow.setOffset(2, 2)
+        card.setGraphicsEffect(shadow)
 
         # Card layout
         card_layout = QVBoxLayout(card)
@@ -643,6 +830,13 @@ class App_storeWindow(DraggableResizableWindow):
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_label.setFixedSize(64, 64)
         icon_label.setScaledContents(True)
+        icon_label.setStyleSheet("""
+            QLabel {
+                background: transparent;
+                border: none;
+                padding: 0;
+            }
+        """)
         
         icon_path = os.path.join("bin", "icons", "local_icons", "inons_apps", app_name, "icon.png")
         if os.path.exists(icon_path):
@@ -658,9 +852,12 @@ class App_storeWindow(DraggableResizableWindow):
         name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         name_label.setStyleSheet("""
             QLabel {
-                color: white;
+                color: #e0e0e0;
                 font-size: 14px;
-                font-weight: bold;
+                font-weight: 500;
+                padding: 0;
+                border: none;
+                background: transparent;
             }
         """)
         card_layout.addWidget(name_label)
@@ -672,6 +869,10 @@ class App_storeWindow(DraggableResizableWindow):
             QLabel {
                 color: #ccc;
                 font-size: 12px;
+                font-weight: 500;
+                padding: 0;
+                border: none;
+                background: transparent;
             }
         """)
         card_layout.addWidget(version_label)
@@ -791,8 +992,55 @@ class App_storeWindow(DraggableResizableWindow):
                                     self.tr("Failed to update {}:\n{}").format(app_name, error_msg))
 
 
+    # def update_updates_layout(self):
+    #     """Update the layout of update cards"""
+    #     # Get all widgets in the layout
+    #     widgets = []
+    #     for i in range(self.updates_layout.count()):
+    #         item = self.updates_layout.itemAt(i)
+    #         if item and item.widget():
+    #             widgets.append(item.widget())
+        
+    #     if not widgets:
+    #         return
+
+    #     # Get current scroll area width
+    #     scroll_width = self.updates_scroll_area.viewport().width()
+        
+    #     # Calculate how many cards fit in a row
+    #     cards_per_row = max(1, (scroll_width - self.spacing) // (self.card_width + self.spacing))
+        
+    #     # Clear the current layout
+    #     for i in reversed(range(self.updates_layout.count())):
+    #         item = self.updates_layout.itemAt(i)
+    #         if item.widget():
+    #             self.updates_layout.removeWidget(item.widget())
+        
+    #     # Redistribute cards in the new layout
+    #     row, col = 0, 0
+    #     for widget in widgets:
+    #         self.updates_layout.addWidget(widget, row, col)
+    #         col += 1
+    #         if col >= cards_per_row:
+    #             col = 0
+    #             row += 1
+
+    #     # Update container size
+    #     rows = (len(widgets) + cards_per_row - 1) // cards_per_row
+    #     container_width = cards_per_row * (self.card_width + self.spacing) + self.spacing
+    #     container_height = rows * (self.card_height + self.spacing) + self.spacing
+    #     self.updates_container.setMinimumSize(container_width, container_height)
+    #     self.updates_container.adjustSize()
     def update_updates_layout(self):
         """Update the layout of update cards"""
+        # Якщо вкладка оновлень ще не готова — нічого не робимо
+        if not hasattr(self, "updates_layout") or self.updates_layout is None:
+            return
+        if not hasattr(self, "updates_scroll_area") or self.updates_scroll_area is None:
+            return
+        if not hasattr(self, "updates_container") or self.updates_container is None:
+            return
+
         # Get all widgets in the layout
         widgets = []
         for i in range(self.updates_layout.count()):

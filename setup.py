@@ -2,7 +2,16 @@ import subprocess
 import sys
 import time
 import traceback
-from PyQt6.QtWidgets import QApplication, QWidget, QTextEdit, QVBoxLayout
+from PyQt6.QtWidgets import (
+    QApplication,
+    QWidget,
+    QTextEdit,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QMessageBox,
+)
+
 from PyQt6.QtCore import Qt
 
 LOG_PATH = "boot_error.log"

@@ -208,7 +208,11 @@ class CalcWindow(DraggableResizableWindow):
         self.display.setText(self.current_input)
 
     def eventFilter(self, source, event):
-        # Ввод с клавиатуры
+        # Якщо display ще не створений — нічого не робимо
+        if not hasattr(self, "display"):
+            return super().eventFilter(source, event)
+
+        # Ввод с клавиатуры только для поля display
         if source == self.display and event.type() == QEvent.Type.KeyPress:
             key = event.key()
             if Qt.Key.Key_0 <= key <= Qt.Key.Key_9:
@@ -235,4 +239,5 @@ class CalcWindow(DraggableResizableWindow):
             elif key in [Qt.Key.Key_Enter, Qt.Key.Key_Return]:
                 self.handle_input('=')
                 return True
+
         return super().eventFilter(source, event)

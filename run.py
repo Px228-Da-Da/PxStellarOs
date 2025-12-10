@@ -49,6 +49,47 @@ def load_stylesheet(path):
         print(f"Не вдалося завантажити стилі: {e}")
         return ""
 
+import json
+import os
+import sys
+
+BASE_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
+
+USER_CONFIG_PATH = os.path.join(BASE_DIR, 'root', 'bin', 'user.config')
+
+
+def get_current_username():
+    """
+    Читает user.config, выводит имя пользователя в системную консоль и возвращает его.
+    """
+    username = "Unknown User"
+    
+    try:
+        # Проверяем существование файла
+        if not os.path.exists(USER_CONFIG_PATH):
+            error_msg = f"[ERROR] user.config not found. Expected path: {USER_CONFIG_PATH}"
+            print(error_msg)
+            return "Error: File not found"
+            
+        with open(USER_CONFIG_PATH, 'r', encoding='utf-8') as f:
+            config_data = json.load(f)
+            # Извлекаем имя пользователя
+            username = config_data.get("user_name", "Unknown User (key missing)")
+            
+    except json.JSONDecodeError:
+        error_msg = "[ERROR] Invalid JSON format in user.config."
+        print(error_msg)
+        username = "Error: Invalid JSON"
+    except Exception as e:
+        error_msg = f"[ERROR] Error reading user data: {e}"
+        print(error_msg)
+        username = "Error: General Exception"
+
+    # 🟢 Вывод имени пользователя прямо в системную консоль (CMD)
+    print(f"[INFO] Current User Name: {username}")
+    
+    return username
+# get_current_username()
 
 
 # --- ALT+TAB SWITCHER -------------------------------------------------
@@ -1201,7 +1242,8 @@ class MacOSWindow(QMainWindow):
 
 
         # === Загрузка пароля ===
-        password_path = os.path.join("root", "dataLacmi", "user", "password")
+        username = get_current_username()
+        password_path = os.path.join("root", f"{username}", "user", "password")
         self._lock_password = None
         try:
             with open(password_path, "r", encoding="utf-8") as f:
@@ -1631,7 +1673,7 @@ class MacOSWindow(QMainWindow):
                 "calc": None,
                 "explorer": None,
                 "notebook": None,
-                "app_store": None
+                "manager_all": None
             }
         except json.JSONDecodeError as e:
             print(f"Ошибка парсинга JSON в файле {config_path}: {e}")
@@ -1643,7 +1685,7 @@ class MacOSWindow(QMainWindow):
                 "calc": None,
                 "explorer": None,
                 "notebook": None,
-                "app_store": None
+                "manager_all": None
             }
         except Exception as e:
             print(f"Неожиданная ошибка при загрузке конфигурации: {e}")
@@ -1654,7 +1696,7 @@ class MacOSWindow(QMainWindow):
                 "calc": None,
                 "explorer": None,
                 "notebook": None,
-                "app_store": None
+                "manager_all": None
             }
 
     def create_menu(self):
@@ -2015,7 +2057,7 @@ class MacOSWindow(QMainWindow):
             translator=self.tr,
             lang_code=getattr(self, "current_language", "en")
         )
-        self.search_box.setPlaceholderText("Пошук...")
+        self.search_box.setPlaceholderText(self.tr("Search..."))
         self.search_box.setStyleSheet("""
             QLineEdit {
                 font-size: 16px;
@@ -2028,7 +2070,7 @@ class MacOSWindow(QMainWindow):
         """)
         left_layout.addWidget(self.search_box)
 
-        all_apps_label = QLabel("Усі додатки")
+        all_apps_label = QLabel(self.tr("all_apps"))
         all_apps_label.setStyleSheet("color: white; font-size: 14px; margin-top: 10px;")
         left_layout.addWidget(all_apps_label)
 
@@ -3208,7 +3250,8 @@ from PyQt6.QtCore import QTimer
 
 # --- Проверка статуса установки ---
 def check_installation_status():
-    install_file = "root/dataLacmi/user/install"
+    username = get_current_username()
+    install_file = f"root/{username}/user/install"
     if not os.path.exists(install_file):
         print("[ERROR] Файл установки не найден:", install_file)
         return False
@@ -3264,3 +3307,4 @@ if __name__ == "__main__":
         sys.exit(app.exec())
     except Exception as e:
         global_exception_handler(type(e), e, e.__traceback__)
+

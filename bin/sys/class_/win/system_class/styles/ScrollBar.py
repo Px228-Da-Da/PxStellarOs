@@ -8,7 +8,7 @@ class CastScrollBar(QScrollBar):
         self.setStyleSheet("""
             QScrollBar:vertical {
                 border: none;
-                background: #f0f0f0;
+                background: #3a3a3a;
                 width: 12px;
                 margin: 16px 0 16px 0;
                 border-radius: 6px;

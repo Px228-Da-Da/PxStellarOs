@@ -719,7 +719,7 @@ class BrowserWindow(DraggableResizableWindow):
         browser.setPage(page)
 
         # Fullscreen
-        browser.page().fullScreenRequested.connect(self.handle_fullscreen_request)
+        # browser.page().fullScreenRequested.connect(self.handle_fullscreen_request)
 
         browser.setUrl(QUrl(url))
 
@@ -747,7 +747,7 @@ class BrowserWindow(DraggableResizableWindow):
 
         page = CustomWebEnginePage(self.profile, new_browser, self)
         new_browser.setPage(page)
-        new_browser.page().fullScreenRequested.connect(self.handle_fullscreen_request)
+        # new_browser.page().fullScreenRequested.connect(self.handle_fullscreen_request)
 
         index = self.tab_widget.addTab(new_browser, self.tr("New Tab"))
         self.tab_widget.setCurrentIndex(index)
@@ -763,12 +763,16 @@ class BrowserWindow(DraggableResizableWindow):
             widget.deleteLater()
         self.tab_widget.removeTab(index)
 
+    # def handle_fullscreen_request(self, request):
+    #     # if request.toggleOn():
+    #     #     self.showFullScreen()
+    #     # else:
+    #     #     self.showNormal()
+    #     # request.accept()
+    #     request.reject()
     def handle_fullscreen_request(self, request):
-        if request.toggleOn():
-            self.showFullScreen()
-        else:
-            self.showNormal()
-        request.accept()
+        request.reject()
+
 
     def load_url(self):
         url = self.search_input.text().strip()

@@ -7,6 +7,10 @@ import threading
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin")))
 from dependencies import *
 
+os.environ["QT_OPENGL"] = "software"
+os.environ["QT_QUICK_BACKEND"] = "software"
+
+
 with open("bin/sys/path/path.json", "r", encoding="utf-8") as f:
     path_data = json.load(f)
     file_paths = path_data.get("files_path", [])
@@ -387,13 +391,29 @@ class MacOSWindow(QMainWindow):
         # Инициализация Wi-Fi
         self.wifi = pywifi.PyWiFi()
         self.iface = None
+        self._meta_down = False
+        self._meta_combo_used = False
+
 
         self.pinned_apps = set()  # Зберігає id закріплених додатків
 
 
         # stylesheet = load_stylesheet("styles.qss")
-        stylesheet = load_stylesheet("bin\sys\class_\win\system_class\styles\styles.qss")
-        self.setStyleSheet(stylesheet)
+        # stylesheet = load_stylesheet("bin\sys\class_\win\system_class\styles\styles.qss")
+        # self.setStyleSheet(stylesheet)
+        import os, sys
+        BASE_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
+
+        styles_path = os.path.join(
+            BASE_DIR,
+            "bin", "sys", "class_", "win", "system_class", "styles", "styles.qss"
+        )
+        stylesheet = load_stylesheet(styles_path)
+        if stylesheet:
+            self.setStyleSheet(stylesheet)
+        else:
+            print(f"[STYLE] Стиль не завантажено, шлях: {styles_path}")
+
         
         try:
             if self.wifi.interfaces():
@@ -449,6 +469,31 @@ class MacOSWindow(QMainWindow):
             self._switcher_active = False
             self.task_switcher = TaskSwitcher(self)
             self.task_switcher.hide()
+
+
+            self.sc_win_e = QShortcut(QKeySequence(Qt.KeyboardModifier.MetaModifier | Qt.Key.Key_E), self)
+            self.sc_win_e.setContext(Qt.ShortcutContext.ApplicationShortcut)
+            self.sc_win_e.activated.connect(lambda: self._on_win_combo("explorer"))
+
+
+            self._win_num_shortcuts = []
+            num_keys = [
+                Qt.Key.Key_1, Qt.Key.Key_2, Qt.Key.Key_3,
+                Qt.Key.Key_4, Qt.Key.Key_5, Qt.Key.Key_6,
+                Qt.Key.Key_7, Qt.Key.Key_8, Qt.Key.Key_9,
+            ]
+
+            for idx, key in enumerate(num_keys, start=1):
+                sc = QShortcut(QKeySequence(Qt.KeyboardModifier.MetaModifier | key), self)
+                sc.setContext(Qt.ShortcutContext.ApplicationShortcut)
+                sc.activated.connect(lambda i=idx: self._activate_dock_slot(i - 1))
+                self._win_num_shortcuts.append(sc)
+
+            # (опционально) Win+0 = 10-е приложение, как в Windows
+            sc0 = QShortcut(QKeySequence(Qt.KeyboardModifier.MetaModifier | Qt.Key.Key_0), self)
+            sc0.setContext(Qt.ShortcutContext.ApplicationShortcut)
+            sc0.activated.connect(lambda: self._activate_dock_slot(9))
+            self._win_num_shortcuts.append(sc0)
 
             
             # Создаем экран блокировки
@@ -745,25 +790,52 @@ class MacOSWindow(QMainWindow):
             self.volume_label.hide()
 
         # === Прокрутка колеса мыши ===
+        # def wheelEvent(event):
+        #     delta = event.angleDelta().y()
+        #     if hasattr(self.volume_widget, "volume"):
+        #         current = self.volume_widget.get_current_volume() / 100.0
+        #         change = 0.05 if delta > 0 else -0.05
+        #         new_volume = max(0.0, min(1.0, current + change))
+        #         try:
+        #             self.volume_widget.volume.SetMasterVolumeLevelScalar(new_volume, None)
+        #         except Exception as e:
+        #             print(f"[VOLUME] Error setting volume: {e}")
+
+        #         # Обновляем UI
+        #         self.volume_widget.update_volume()
+        #         self.update_volume_icon()
+
+        #         # 🔸 обновляем текст процента (даже если мышь не ушла)
+        #         show_volume_label()
+
+        #         # print(f"[VOLUME] Volume set to: {int(new_volume * 100)}%")
         def wheelEvent(event):
             delta = event.angleDelta().y()
-            if hasattr(self.volume_widget, "volume"):
-                current = self.volume_widget.get_current_volume() / 100.0
-                change = 0.05 if delta > 0 else -0.05
-                new_volume = max(0.0, min(1.0, current + change))
-                try:
-                    self.volume_widget.volume.SetMasterVolumeLevelScalar(new_volume, None)
-                except Exception as e:
-                    print(f"[VOLUME] Error setting volume: {e}")
+            step = 5
 
-                # Обновляем UI
+            # print(f"[VOLUME] wheel delta={delta}")  # 👈 тимчасовий лог
+
+            try:
+                current = int(self.volume_widget.get_current_volume())
+            except Exception as e:
+                print(f"[VOLUME] Error get_current_volume: {e}")
+                return
+
+            if delta > 0:
+                new_volume = current + step
+            else:
+                new_volume = current - step
+
+            new_volume = max(0, min(100, new_volume))
+
+            try:
+                self.volume_widget.set_current_volume(new_volume)
                 self.volume_widget.update_volume()
                 self.update_volume_icon()
-
-                # 🔸 обновляем текст процента (даже если мышь не ушла)
                 show_volume_label()
+            except Exception as e:
+                print(f"[VOLUME] Error setting volume: {e}")
 
-                # print(f"[VOLUME] Volume set to: {int(new_volume * 100)}%")
 
         # Привязываем события
         self.volume_button_container.enterEvent = lambda e: show_volume_label()
@@ -776,7 +848,50 @@ class MacOSWindow(QMainWindow):
         self.volume_timer.timeout.connect(self.update_volume_icon)
         self.volume_timer.start(1000)
 
+    def _get_dock_order(self) -> list[str]:
+        """
+        Порядок приложений как в доке:
+        1) закрепленные из dock.config (self.allowed_apps)
+        2) динамические (если ты добавляешь открытые не закрепленные)
+        """
+        order = []
 
+        # закрепленные (в правильном порядке из dock.config)
+        if hasattr(self, "allowed_apps") and self.allowed_apps:
+            order.extend(self.allowed_apps)
+        else:
+            # запасной вариант: порядок ключей dock_buttons
+            order.extend(list(getattr(self, "dock_buttons", {}).keys()))
+
+        # динамические кнопки (добавляются при открытии не закрепленных) :contentReference[oaicite:1]{index=1}
+        for name in getattr(self, "dynamic_dock_buttons", {}).keys():
+            if name not in order:
+                order.append(name)
+
+        return order
+
+
+    def _activate_dock_slot(self, slot_index: int):
+        order = self._get_dock_order()
+        if slot_index < 0 or slot_index >= len(order):
+            return
+
+        app_id = order[slot_index]
+
+        # чтобы после Win+цифра не открывался Start при отпускании Win
+        if hasattr(self, "_meta_combo_used"):
+            self._meta_combo_used = True
+
+        # поведение "как в Windows": если уже активно — свернуть, иначе активировать/открыть
+        win = getattr(self, "open_windows", {}).get(app_id)
+        active = getattr(self, "active_window_name", None)
+
+        if win and active == app_id and not win.isMinimized():
+            win.showMinimized()
+            return
+
+        # switch_window у тебя и активирует окно, и добавляет кнопку в док если надо :contentReference[oaicite:2]{index=2}
+        self.switch_window(app_id)
 
 
     def toggle_volume_control(self):
@@ -1116,6 +1231,10 @@ class MacOSWindow(QMainWindow):
                     with open(desk_config_path, "r", encoding="utf-8") as f:
                         desk_data = json.load(f)
                         background_path = desk_data.get("lock_screen_path") or desk_data.get("lockscreen_path")
+                        if background_path:
+                            # Нормалізація для Linux/Win
+                            background_path = background_path.replace("\\", "/")
+                            background_path = os.path.normpath(background_path)
                         log(f"[LockScreen] Path from config: {background_path}")
                 except json.JSONDecodeError:
                     log("[LockScreen] JSON decode error у desk.config")
@@ -1655,7 +1774,8 @@ class MacOSWindow(QMainWindow):
         """
         Инициализация окон. Окна создаются только при первом открытии.
         """
-        config_path = r"root\bin\list_apps\list_apps.config"
+        #config_path = r"root\bin\list_apps\list_apps.config"
+        config_path = os.path.join("root", "bin", "list_apps", "list_apps.config")
         
         try:
             with open(config_path, 'r', encoding='utf-8') as file:
@@ -1861,13 +1981,17 @@ class MacOSWindow(QMainWindow):
         #     return
         # Win + L (у вас Win + Y)
         if event.key() == Qt.Key.Key_L and event.modifiers() & Qt.KeyboardModifier.MetaModifier:
+            self._meta_combo_used = True
             self.lock_screen()
-            return  # дуже важливо повернутися, щоб не відкривалося меню
+            return
+
 
         # Win key — відкриття/закриття меню
         elif event.key() == Qt.Key.Key_Meta:
-            self.toggle_start_menu()
+            self._meta_down = True
+            self._meta_combo_used = False
             return
+
         
         # # Win + L (вместо Ctrl + L)
         # if event.key() == Qt.Key.Key_Y and event.modifiers() & Qt.KeyboardModifier.MetaModifier:
@@ -1913,14 +2037,24 @@ class MacOSWindow(QMainWindow):
         super().keyPressEvent(event)
 
     def keyReleaseEvent(self, event):
-        # отпускание ALT — применить выбор
+        # отпускание WIN (Meta) — открываем Start только если WIN был нажат один
+        if event.key() == Qt.Key.Key_Meta:
+            if self._meta_down and not self._meta_combo_used:
+                self.toggle_start_menu()
+            self._meta_down = False
+            self._meta_combo_used = False
+            return
+
+        # ... дальше твой код (ALT для switcher и т.д.)
         if self._switcher_active and event.key() == Qt.Key.Key_Alt:
             chosen = self.task_switcher.finalize()
             self._switcher_active = False
             if chosen:
-                self.switch_window(chosen)  # уже есть у тебя
+                self.switch_window(chosen)
             return
+
         super().keyReleaseEvent(event)
+
 
 
     def _switch_keyboard_layout(self):
@@ -3116,6 +3250,12 @@ class MacOSWindow(QMainWindow):
 
         self.dock.setFixedSize(dock_width, dock_height)
 
+    def _on_win_combo(self, window_name: str):
+        # помечаем, что Win использовали в комбинации (чтобы Start не открывался)
+        self._meta_combo_used = True
+        self.switch_window(window_name)
+
+
 
     def reload_widgets(self):
         """Перезавантажує системні елементи без перезапуску ОС"""
@@ -3285,14 +3425,13 @@ if __name__ == "__main__":
 
     try:
         app = QApplication(sys.argv)
-        
         # ПРЕДВАРИТЕЛЬНАЯ ИНИЦИАЛИЗАЦИЯ QWebEngineView ДЛЯ УСКОРЕНИЯ ЗАПУСКА
-        print("Preloading QWebEngineView...")
-        preload_webengine = QWebEngineView()
-        preload_webengine.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, True)
-        preload_webengine.settings().setAttribute(QWebEngineSettings.WebAttribute.PlaybackRequiresUserGesture, False)
-        preload_webengine.setHtml("<html><body><p>Loading...</p></body></html>")
-        QTimer.singleShot(100, preload_webengine.deleteLater)
+        # print("Preloading QWebEngineView...")
+        # preload_webengine = QWebEngineView()
+        # preload_webengine.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, True)
+        # preload_webengine.settings().setAttribute(QWebEngineSettings.WebAttribute.PlaybackRequiresUserGesture, False)
+        # preload_webengine.setHtml("<html><body><p>Loading...</p></body></html>")
+        # QTimer.singleShot(100, preload_webengine.deleteLater)
         QApplication.processEvents()
         
         # Создаём и показываем основное окно

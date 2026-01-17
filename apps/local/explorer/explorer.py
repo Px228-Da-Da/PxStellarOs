@@ -710,6 +710,29 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import QObject, QEvent
+
+
+class MouseNavFilter(QObject):
+    def __init__(self, on_back, on_forward, parent=None):
+        super().__init__(parent)
+        self._on_back = on_back
+        self._on_forward = on_forward
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Type.MouseButtonPress:
+            btn = event.button()
+
+            # Основные коды (обычно так и будет)
+            if btn in (Qt.MouseButton.BackButton, Qt.MouseButton.ExtraButton1):
+                self._on_back()
+                return True
+
+            if btn in (Qt.MouseButton.ForwardButton, Qt.MouseButton.ExtraButton2):
+                self._on_forward()
+                return True
+
+        return False
 
 class OpenWithDialog(QDialog):
     CONFIG_PATH = "bin/sys/path/open_with.json"
@@ -1073,6 +1096,27 @@ class ExplorerWindow(DraggableResizableWindow):
 
         # === Hotkeys ===
         self.setup_shortcuts()
+                # === Mouse back/forward buttons ===
+        self._mouse_nav_filter = MouseNavFilter(self.go_back, self.go_forward, self)
+
+        # Вешаем на окно и ключевые зоны, чтобы работало независимо от фокуса
+        self.installEventFilter(self._mouse_nav_filter)
+        self.container.installEventFilter(self._mouse_nav_filter)
+
+        # Главное: QListWidget часто принимает клики через viewport()
+        self.file_list.installEventFilter(self._mouse_nav_filter)
+        self.file_list.viewport().installEventFilter(self._mouse_nav_filter)
+
+        self.places_list.installEventFilter(self._mouse_nav_filter)
+        self.places_list.viewport().installEventFilter(self._mouse_nav_filter)
+
+        # Дополнительно можно повесить на поля ввода
+        self.path_edit.installEventFilter(self._mouse_nav_filter)
+        self.search_edit.installEventFilter(self._mouse_nav_filter)
+
+        # И на панель деталей
+        self.details_panel.installEventFilter(self._mouse_nav_filter)
+
 
 
     def open_path(self, path: str):

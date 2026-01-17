@@ -59,7 +59,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 
-install_dependencies()
+# install_dependencies()
 
 # | Символ  | Заміна      |
 # | ------  | ----------- |
@@ -114,9 +114,10 @@ from PyQt6.QtGui import (
 from PyQt6.QtCore import (
     Qt, QSize, QRect, QEvent, QPropertyAnimation, QEasingCurve, QTimer,
     QTime, QDate, QUrl, QPoint, QProcess, pyqtProperty, QDateTime, QParallelAnimationGroup,
-    QRectF, QMimeData
+    QRectF, QMimeData, QCoreApplication
 )
-
+from PyQt6.QtGui import QShortcut, QKeySequence
+# from PyQt6.QtCore import 
 # from PyQt6.QtGui import QColor, 
 # from PyQt6.QtCore import 
 

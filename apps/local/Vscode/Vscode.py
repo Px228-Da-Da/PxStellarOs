@@ -447,7 +447,47 @@ class Bridge(QObject):
             # передаём в JS
             self.editor_window.browser.page().runJavaScript(f"loadProjectFiles({entries}, {repr(path)});")
 
+import json
+import os
+import sys
 
+BASE_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
+
+USER_CONFIG_PATH = os.path.join(BASE_DIR, 'root', 'bin', 'user.config')
+
+
+def get_current_username():
+    """
+    Читает user.config, выводит имя пользователя в системную консоль и возвращает его.
+    """
+    username = "Unknown User"
+    
+    try:
+        # Проверяем существование файла
+        if not os.path.exists(USER_CONFIG_PATH):
+            error_msg = f"[ERROR] user.config not found. Expected path: {USER_CONFIG_PATH}"
+            print(error_msg)
+            return "Error: File not found"
+            
+        with open(USER_CONFIG_PATH, 'r', encoding='utf-8') as f:
+            config_data = json.load(f)
+            # Извлекаем имя пользователя
+            username = config_data.get("user_name", "Unknown User (key missing)")
+            
+    except json.JSONDecodeError:
+        error_msg = "[ERROR] Invalid JSON format in user.config."
+        print(error_msg)
+        username = "Error: Invalid JSON"
+    except Exception as e:
+        error_msg = f"[ERROR] Error reading user data: {e}"
+        print(error_msg)
+        username = "Error: General Exception"
+
+    # 🟢 Вывод имени пользователя прямо в системную консоль (CMD)
+    print(f"[INFO] Current User Name: {username}")
+    
+    return username
+# get_current_username()
 
 
 class VscodeWindow(DraggableResizableWindow):
@@ -503,6 +543,7 @@ class VscodeWindow(DraggableResizableWindow):
         separator.setFrameShape(QFrame.Shape.HLine)
         separator.setFrameShadow(QFrame.Shadow.Sunken)
         layout.addWidget(separator)
+        self.username = get_current_username()
 
         # === Monaco Editor (QWebEngineView) ===
         self.browser = QWebEngineView()
@@ -514,7 +555,7 @@ class VscodeWindow(DraggableResizableWindow):
 
         # Настраиваем профиль (путь для кеша и storage)
         self.profile = QWebEngineProfile("VscodeProfile", self)
-        browser_data_path = os.path.join(os.getcwd(), "root", "dataLacmi", "browser")
+        browser_data_path = os.path.join(os.getcwd(), "root", f"{self.username}", "browser")
         os.makedirs(browser_data_path, exist_ok=True)
         self.profile.setPersistentStoragePath(os.path.join(browser_data_path, "web_profile"))
         self.profile.setCachePath(os.path.join(browser_data_path, "web_cache"))

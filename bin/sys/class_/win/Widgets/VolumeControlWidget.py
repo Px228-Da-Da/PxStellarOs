@@ -11,6 +11,10 @@ from PyQt6.QtCore import Qt, QRectF
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin")))
 from dependencies import *
 
+import platform
+IS_WINDOWS = platform.system() == "Windows"
+
+
 class VolumeControlWidget(QWidget):
     def __init__(self, parent=None, translator=None, lang_code="en"):
         super().__init__(parent)
@@ -20,6 +24,7 @@ class VolumeControlWidget(QWidget):
         self.volume = None  # Для Windows
         self.init_audio()
         self.init_ui()
+        
 
     def init_audio(self):
         """Инициализация аудио-интерфейса с обработкой ошибок"""
@@ -140,6 +145,50 @@ class VolumeControlWidget(QWidget):
         except Exception as e:
             print(f"Get volume error: {e}")
         return 100  # Значение по умолчанию
+
+    # def set_current_volume(self, percent: int):
+    #     """Кросплатформене зміна гучності (0..100)."""
+    #     percent = max(0, min(100, int(percent)))
+
+    #     try:
+    #         if IS_WINDOWS:
+    #             # 🔵 Windows: pycaw
+    #             if self.volume:
+    #                 self.volume.SetMasterVolumeLevelScalar(percent / 100.0, None)
+    #         else:
+    #             # 🐧 Linux: pulsectl – те саме, що в set_system_volume()
+    #             if self.pulse:
+    #                 sink = self.pulse.get_sink_by_name(
+    #                     self.pulse.server_info().default_sink_name
+    #                 )
+    #                 vol = self.pulse.volume_get_all_chans(sink)
+    #                 vol.value_flat = float(percent) / 100.0
+    #                 self.pulse.volume_set(sink, vol)
+
+    #         # оновлюємо слайдер і текст
+    #         self.update_volume()
+    #     except Exception as e:
+    #         print(f"[VolumeControlWidget] set_current_volume error: {e}")
+
+    def set_current_volume(self, percent: int):
+        percent = max(0, min(100, int(percent)))
+
+        try:
+            if IS_WINDOWS:
+                if self.volume:
+                    self.volume.SetMasterVolumeLevelScalar(percent / 100.0, None)
+            else:
+                if self.pulse:
+                    sink = self.pulse.get_sink_by_name(
+                        self.pulse.server_info().default_sink_name
+                    )
+                    volume_level = percent / 100.0
+                    self.pulse.volume_set_all_chans(sink, volume_level)
+
+            self.update_volume()
+        except Exception as e:
+            print(f"[VolumeControlWidget] set_current_volume error: {e}")
+
 
     def update_volume(self):
         """Обновляет ползунок текущей громкостью"""

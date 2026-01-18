@@ -326,6 +326,7 @@ class TaskSwitcher(QWidget):
             self.cancel()
         super().mousePressEvent(event)
 
+    # алт таб tab (((
     def keyPressEvent(self, event):
         """Обработка клавиш"""
         if event.key() == Qt.Key.Key_Escape:
@@ -470,11 +471,9 @@ class MacOSWindow(QMainWindow):
             self.task_switcher = TaskSwitcher(self)
             self.task_switcher.hide()
 
-
             self.sc_win_e = QShortcut(QKeySequence(Qt.KeyboardModifier.MetaModifier | Qt.Key.Key_E), self)
             self.sc_win_e.setContext(Qt.ShortcutContext.ApplicationShortcut)
             self.sc_win_e.activated.connect(lambda: self._on_win_combo("explorer"))
-
 
             self._win_num_shortcuts = []
             num_keys = [
@@ -1961,63 +1960,66 @@ class MacOSWindow(QMainWindow):
     
     def keyPressEvent(self, event: QKeyEvent):
         """Обробляє натискання клавіш у глобальному контексті"""
+        WIN_KEYS = {Qt.Key.Key_Meta, Qt.Key.Key_Super_L, Qt.Key.Key_Super_R}
+
+        # если Start открыт — печатаем в search_box (твоя логика)
         if hasattr(self, "start_menu") and self.start_menu.isVisible():
-            if event.text():  # перевірка, що це текстовий символ
+            if event.text():
                 self.search_box.setFocus()
                 cursor = self.search_box.cursorPosition()
                 current_text = self.search_box.text()
-                # вставляємо символ у поточну позицію курсора
                 self.search_box.setText(current_text[:cursor] + event.text() + current_text[cursor:])
                 self.search_box.setCursorPosition(cursor + 1)
-                return  # не передаємо подію далі
+                return
+
         if self.is_locked or self.is_splash_screen_active:
             return super().keyPressEvent(event)
 
         current_time = QDateTime.currentMSecsSinceEpoch()
-        
-        # Win key (Meta) - открытие/закрытие меню
-        # if event.key() == Qt.Key.Key_Meta:
-        #     self.toggle_start_menu()
-        #     return
-        # Win + L (у вас Win + Y)
-        if event.key() == Qt.Key.Key_L and event.modifiers() & Qt.KeyboardModifier.MetaModifier:
+
+        # --- Win+L (оставим твою обработку) ---
+        if event.key() == Qt.Key.Key_L and (event.modifiers() & Qt.KeyboardModifier.MetaModifier):
             self._meta_combo_used = True
             self.lock_screen()
             return
 
-
-        # Win key — відкриття/закриття меню
-        elif event.key() == Qt.Key.Key_Meta:
+        # --- Нажали Win (Meta/Super) ---
+        if event.key() in WIN_KEYS:
+            if event.isAutoRepeat():
+                return
             self._meta_down = True
             self._meta_combo_used = False
             return
 
-        
-        # # Win + L (вместо Ctrl + L)
-        # if event.key() == Qt.Key.Key_Y and event.modifiers() & Qt.KeyboardModifier.MetaModifier:
-        #     self.lock_screen()
-        # Alt + Shift (оставляем без изменений)
-        # elif ((event.key() == Qt.Key.Key_Shift and event.modifiers() & Qt.KeyboardModifier.AltModifier) or
-        #      (event.key() == Qt.Key.Key_Alt and event.modifiers() & Qt.KeyboardModifier.ShiftModifier)):
-        #     if current_time - self.last_layout_switch_time > self.layout_switch_delay:
-        #         self._switch_keyboard_layout()
-        #         self.last_layout_switch_time = current_time
-        elif ((event.key() == Qt.Key.Key_Shift and event.modifiers() & Qt.KeyboardModifier.AltModifier) or
+        # --- Пока Win зажат: ловим любые комбинации ---
+        if getattr(self, "_meta_down", False):
+            # любая другая клавиша + Win = "комбо было", Start потом не открывать
+            if event.key() not in WIN_KEYS:
+                self._meta_combo_used = True
+
+            # Win + E -> открыть твой проводник
+            if event.key() == Qt.Key.Key_E:
+                self._on_win_combo("explorer")
+                return
+
+            # (опционально) если хочешь, чтобы Win+L работал даже когда modifiers не пришли:
+            if event.key() == Qt.Key.Key_L:
+                self.lock_screen()
+                return
+
+            # остальные Win+... пусть обрабатываются QShortcut-ами (Win+1..9 и т.п.)
+            # поэтому не return
+
+        # --- дальше твой существующий код ---
+        if ((event.key() == Qt.Key.Key_Shift and event.modifiers() & Qt.KeyboardModifier.AltModifier) or
             (event.key() == Qt.Key.Key_Alt and event.modifiers() & Qt.KeyboardModifier.ShiftModifier)):
             if current_time - self.last_layout_switch_time > self.layout_switch_delay:
-                self.switch_language()   # <-- использует set_language(...) и notify-send
+                self.switch_language()
                 self.last_layout_switch_time = current_time
 
-
-        # Win + Tab (вместо Alt + Tab)
-        # elif event.key() == Qt.Key.Key_Tab and event.modifiers() & Qt.KeyboardModifier.MetaModifier:
-        #     self.switch_to_next_window()
-        # Enter (оставляем без изменений)
         elif event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
             self.unlock_screen()
 
-
-        # ALT+TAB — открыть/листать; ALT+SHIFT+TAB — назад
         elif event.key() == Qt.Key.Key_Tab and (event.modifiers() & Qt.KeyboardModifier.AltModifier):
             if not self._switcher_active:
                 self._open_switcher(reverse=bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier))
@@ -2026,19 +2028,23 @@ class MacOSWindow(QMainWindow):
                     self.task_switcher.prev()
                 else:
                     self.task_switcher.next()
-            return  # не пробрасываем дальше
+            return
 
-        # ESC — отменить выбор, если открыт переключатель
         elif self._switcher_active and event.key() == Qt.Key.Key_Escape:
             self.task_switcher.cancel()
             self._switcher_active = False
             return
-        
+
         super().keyPressEvent(event)
 
+
     def keyReleaseEvent(self, event):
-        # отпускание WIN (Meta) — открываем Start только если WIN был нажат один
-        if event.key() == Qt.Key.Key_Meta:
+        WIN_KEYS = {Qt.Key.Key_Meta, Qt.Key.Key_Super_L, Qt.Key.Key_Super_R}
+
+        # отпустили Win — открыть Start только если Win был "один"
+        if event.key() in WIN_KEYS:
+            if event.isAutoRepeat():
+                return
             if self._meta_down and not self._meta_combo_used:
                 self.toggle_start_menu()
             self._meta_down = False
@@ -2054,6 +2060,7 @@ class MacOSWindow(QMainWindow):
             return
 
         super().keyReleaseEvent(event)
+
 
 
 

@@ -1086,29 +1086,40 @@ class SettingsWindow(DraggableResizableWindow):
     def backup_current_version(self):
         backup_dir = "backup"
         try:
-            if not os.path.exists(backup_dir):
-                os.makedirs(backup_dir)
+            # 1) Всегда делаем backup "чистым", иначе будут конфликты файлов/симлинков
+            if os.path.exists(backup_dir):
+                shutil.rmtree(backup_dir)
+            os.makedirs(backup_dir, exist_ok=True)
+
+            # 2) Что НЕ копируем (venv — главный виновник ошибки)
+            SKIP = {"backup", "system_backup", "venv", ".venv", "__pycache__"}
+
+            def ignore_func(dirpath, names):
+                ignored = set()
+                for n in names:
+                    if n in SKIP or n.endswith(".pyc"):
+                        ignored.add(n)
+                # можно добавить ещё тяжёлые кэши при желании:
+                # ignored.add("cache")
+                return ignored
 
             for item in os.listdir("."):
-                if item != backup_dir and not item.startswith('.'):
-                    src_path = os.path.join(".", item)
-                    dst_path = os.path.join(backup_dir, item)
+                if item in SKIP or item.startswith('.'):
+                    continue
 
-                    if os.path.isdir(src_path):
-                        # 🔹 Копіюємо директорію без помилок при існуванні файлів
-                        shutil.copytree(
-                            src_path,
-                            dst_path,
-                            symlinks=True,
-                            dirs_exist_ok=True,  # ✅ дозволяє існуючі файли
-                            ignore=shutil.ignore_patterns("*.pyc", "__pycache__")
-                        )
-                    else:
-                        # 🔹 Якщо файл уже існує — пропускаємо
-                        try:
-                            shutil.copy2(src_path, dst_path)
-                        except FileExistsError:
-                            pass
+                src_path = os.path.join(".", item)
+                dst_path = os.path.join(backup_dir, item)
+
+                if os.path.isdir(src_path):
+                    shutil.copytree(
+                        src_path,
+                        dst_path,
+                        symlinks=True,          # можно оставить
+                        dirs_exist_ok=False,    # теперь не нужно "сливать" в существующее
+                        ignore=ignore_func
+                    )
+                else:
+                    shutil.copy2(src_path, dst_path)
 
             return True
 
@@ -1120,6 +1131,7 @@ class SettingsWindow(DraggableResizableWindow):
                 f"{self.tr('Failed to create backup')}:\n{str(e)}"
             )
             return False
+
 
 
     def rollback_update(self):

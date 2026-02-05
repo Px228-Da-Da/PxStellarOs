@@ -82,6 +82,13 @@ class CustomWebEnginePage(QWebEnginePage):
     def createWindow(self, web_window_type):
         return self.browser_window.create_new_tab_from_page(web_window_type)
     
+    def javaScriptConfirm(self, securityOrigin, msg: str) -> bool:
+        # ✅ авто-нажатие OK для "leave this page"
+        low = (msg or "").lower()
+        if "leave this page" in low or "changes that you made may not be saved" in low:
+            return True
+        return super().javaScriptConfirm(securityOrigin, msg)
+
     def chooseFiles(self, mode, old_files, accepted_mime_types):
         try:
             parent_widget = self.parent()
@@ -250,9 +257,8 @@ class BrowserWindow(DraggableResizableWindow):
             QTabBar::close-button {
                 image: url(apps/local/browser/icons/close-light.png);
                 subcontrol-position: right;
-                margin-left: 8px;
-                width: 30px;
-                height: 30px;
+                width: 20px;
+                height: 20px;
             }
 
             QTabBar::close-button:hover {
@@ -272,10 +278,11 @@ class BrowserWindow(DraggableResizableWindow):
         # self.profile.setCachePath(cache_path)
         # self.profile.setPersistentStoragePath(cache_path)
         # Профиль для кеша/куков
-        self.profile = QWebEngineProfile("BrowserProfile", self)
-        cache_path = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.CacheLocation)
-        self.profile.setCachePath(cache_path)
-        self.profile.setPersistentStoragePath(cache_path)
+        # self.profile = QWebEngineProfile("BrowserProfile", self)
+        # cache_path = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.CacheLocation)
+        # self.profile.setCachePath(cache_path)
+        # self.profile.setPersistentStoragePath(cache_path)
+        self.profile = get_shared_profile(self)
 
         # === Автоскачивание файлов ===
         self.download_path = os.path.join("root", "user", "download")
@@ -368,8 +375,18 @@ class BrowserWindow(DraggableResizableWindow):
 
     # --- CLOSE EVENT ---
     def closeEvent(self, event):
+        try:
+            for i in reversed(range(self.tab_widget.count())):
+                w = self.tab_widget.widget(i)
+                if w:
+                    w.deleteLater()
+            self.tab_widget.clear()
+        except Exception as e:
+            print("[CLOSE] cleanup error:", e)
+
         self.save_session()
         super().closeEvent(event)
+
 
     # --- SAVE SESSION ---
     def save_session(self):
@@ -685,8 +702,14 @@ class BrowserWindow(DraggableResizableWindow):
                     return
 
             # === Открываем конкретную папку загрузок ===
-            if hasattr(explorer_window, 'open_path'):
+            if hasattr(explorer_window, "open_or_switch_tab"):
+                explorer_window.open_or_switch_tab(path)
+            elif hasattr(explorer_window, "open_path"):
                 explorer_window.open_path(path)
+            else:
+                # fallback
+                explorer_window.load_directory(path)
+
 
             explorer_window.show()
             explorer_window.raise_()

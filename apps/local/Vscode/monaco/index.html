@@ -4,68 +4,172 @@
 <meta charset="UTF-8">
 <title>VSCode (Lite)</title>
 <style>
-html, body {
-    margin: 0;
-    height: 100%;
-    overflow: hidden;
-    font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+html, body{
+  margin:0; height:100%; overflow:hidden;
+  font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+  background:#1e1e1e;
 }
-#root { display: flex; flex-direction: row; height: 100%; }
+#root{ display:flex; height:100%; min-height:0; min-width:0; }
 
-/* Левая панель */
-.activitybar {
-    width: 48px;
-    background-color: #252526;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 4px 0;
-}
-.activitybar button {
-    background: none;
-    border: none;
-    padding: 12px;
-    cursor: pointer;
-    color: #cccccc;
-    font-size: 18px;
-}
-.activitybar button:hover { background: #373737; }
-
-/* Explorer */
-.explorer {
-    width: 200px;
-    background: #1e1e1e;
-    color: #ccc;
-    overflow: auto;
-    padding: 4px;
+/* ✅ Запрещаем выделение текста в интерфейсе (сайдбар, табы, статусбар и т.п.) */
+.activitybar,
+#explorer,
+.statusbar,
+.sidebar,
+.sidebar-header,
+.section,
+.section-title,
+.explorer-item,
+#root {
+  -webkit-user-select: none;
+  user-select: none;
 }
 
-/* Центральная зона */
-.main { flex: 1; display: flex; flex-direction: column; height: 100%; }
-
-#container { flex: 1; background: #1e1e1e; }
-
-/* Статус-бар */
-.statusbar {
-    height: 22px;
-    background: #007acc;
-    color: white;
-    font-size: 12px;
-    padding: 2px 8px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+/* ✅ Разрешаем выделение внутри Monaco */
+#container,
+#container * {
+  -webkit-user-select: text !important;
+  user-select: text !important;
 }
-.status-left, .status-right { display: flex; gap: 12px; align-items: center; }
-.status-left span, .status-right span { pointer-events: none; }
+
+/* ✅ Разрешаем выделение в полях ввода (если появятся) */
+input, textarea {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
+
+
+/* Activity bar */
+.activitybar{
+  width:48px; background:#333333;
+  display:flex; flex-direction:column; align-items:center;
+  padding:6px 0;
+  border-right:1px solid #2a2a2a;
+}
+.activitybar button{
+  width:48px; height:48px;
+  background:none; border:none;
+  cursor:pointer;
+  color:#c5c5c5; font-size:18px;
+}
+.activitybar button:hover{ background:#2a2a2a; }
+.activitybar .active{ color:#fff; }
+
+/* Side bar */
+.sidebar{
+  width:300px;
+  background:#252526;
+  color:#ccc;
+;
+  display:flex; flex-direction:column;
+  border-right:1px solid #2a2a2a;
+  min-width:0; min-height:0;
+}
+.sidebar-header{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:10px 10px 6px 12px;
+  font-size:12px; letter-spacing:1px;
+  color:#c5c5c5;
+}
+.sidebar-header .dots{
+  opacity:.8;
+  padding:2px 8px;
+  border-radius:4px;
+}
+.sidebar-header .dots:hover{ background:rgba(255,255,255,.06); cursor:pointer; }
+
+.section{
+  padding:6px 0;
+}
+.section-title{
+  padding:6px 12px;
+  font-size:11px;
+  color:#bbbbbb;
+  display:flex; align-items:center;
+  gap:6px;
+  user-select:none;
+}
+.section-title .chev{ opacity:.8; }
+.section-body{
+  padding:2px 0;
+}
+
+/* explorer items */
+.explorer-item{
+  padding:4px 12px 4px 20px;
+  cursor:pointer;
+  color:#ddd;
+  user-select:none;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  font-size:13px;
+}
+.explorer-item:hover{ background: rgba(255,255,255,0.06); }
+.explorer-item.active{ background: rgba(255,255,255,0.10); }
+
+/* Main editor */
+.main{
+  flex:1; display:flex; flex-direction:column;
+  min-width:0; min-height:0;
+  background:#1e1e1e;
+}
+#container{
+  flex:1;
+  min-width:0; min-height:0;
+}
+
+/* Status bar */
+.statusbar{
+  height:22px;
+  background:#007acc;
+  color:#fff;
+  font-size:12px;
+  padding:2px 10px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  user-select:none;
+}
+.status-left, .status-right{
+  display:flex; align-items:center; gap:12px;
+}
+
+
+/* ===== Monaco overlays must NOT affect layout ===== */
+#container {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Monaco overlays/widgets (command palette, suggest, hover) should be absolute */
+.monaco-editor .overlayWidgets,
+.monaco-editor .overlayWidgets > .widget,
+.monaco-editor .quick-input-widget,
+.monaco-editor .suggest-widget,
+.monaco-editor .parameter-hints-widget,
+.monaco-editor .monaco-hover,
+.monaco-editor .context-view {
+  position: absolute !important;
+  z-index: 9999 !important;
+}
+
+/* Иногда quick-input растягивает блок — фиксируем ширину/центр */
+.monaco-editor .quick-input-widget {
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  top: 8px !important;
+}
+
 </style>
 </head>
 <body>
 <div id="root">
-<!--     <div class="activitybar">
+    <div class="activitybar">
         <button title="Explorer">📂</button>
     </div>
-    <div class="explorer" id="explorer"></div> -->
+    <div class="explorer" id="explorer"></div>
+
     <div class="main">
         <div id="container"></div>
         <div class="statusbar">
@@ -137,25 +241,49 @@ require(['vs/editor/editor.main'], function () {
 
 
 // Показываем файлы в Explorer
-window.loadProjectFiles = function(files) {
-    const exp = document.getElementById('explorer');
-    exp.innerHTML = "";
-    files.forEach(f => {
-        const btn = document.createElement('button');
-        btn.textContent = f;
-        btn.style.display = "block";
-        btn.style.width = "100%";
-        btn.style.marginBottom = "2px";
-        btn.style.color = "#ccc";
-        btn.style.background = "none";
-        btn.style.border = "none";
-        btn.style.textAlign = "left";
-        btn.addEventListener('click', () => {
-            bridge.open_file(f);
-        });
-        exp.appendChild(btn);
+window.loadProjectFiles = function(entries, path) {
+  const exp = document.getElementById('explorer');
+  if (!exp) return;
+
+  exp.innerHTML = "";
+
+  // заголовок: только название текущей папки
+  const head = document.createElement("div");
+  let p = String(path || "").replace(/\\/g, "/");
+  let folderName = p.split("/").filter(Boolean).pop() || "";
+  head.textContent = folderName;  // ✅ вместо полного пути
+  head.style.padding = "6px";
+  head.style.color = "#888";
+  head.style.fontSize = "12px";
+  exp.appendChild(head);
+
+
+  if (!Array.isArray(entries)) return;
+
+  entries.forEach(e => {
+    const row = document.createElement("div");
+    row.className = "explorer-item";
+
+    // ✅ ВОТ ТУТ главная причина [object Object]
+    const name = (e && e.name) ? e.name : String(e);
+    const type = (e && e.type) ? e.type : "file";
+
+    row.textContent = (type === "folder" ? "📁 " : "📄 ") + name;
+
+    row.addEventListener("click", () => {
+      if (!window.bridge) return;
+
+      if (type === "folder") {
+        bridge.open_folder_path(path + "/" + name);
+      } else {
+        bridge.open_file(name); // open_file соберёт fullpath из current_folder
+      }
     });
+
+    exp.appendChild(row);
+  });
 };
+
 
 function initWebChannel() {
     new QWebChannel(qt.webChannelTransport, function(channel) {
@@ -175,6 +303,38 @@ window.setEncoding = function(enc) {
 };
 
 window.addEventListener('DOMContentLoaded', initWebChannel);
+
+window.addEventListener('resize', () => {
+  if (window.editor) window.editor.layout();
+});
+
+window.setValueWithLanguage = function(code, lang) {
+  const old = window.editor.getModel();
+  if (old) old.dispose();
+
+  const model = monaco.editor.createModel(code, lang);
+  window.editor.setModel(model);
+
+  // важное: layout несколько раз (QWebEngine иногда даёт неправильный размер сразу)
+  window.editor.layout();
+  setTimeout(() => window.editor && window.editor.layout(), 0);
+  setTimeout(() => window.editor && window.editor.layout(), 50);
+};
+
+// ✅ Запрещаем выделение текста вне редактора (и вне input/textarea)
+document.addEventListener("selectstart", function (e) {
+  const container = document.getElementById("container");
+  const t = e.target;
+
+  const isInEditor = container && container.contains(t);
+  const isInput = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
+
+  if (!isInEditor && !isInput) {
+    e.preventDefault();
+    return false;
+  }
+}, true);
+
 </script>
 </body>
 </html>

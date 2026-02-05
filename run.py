@@ -1,15 +1,31 @@
 import sys
 import os
 import shutil
+
+# 1) QtWebEngine: отключаем GPU/композитинг Chromium
+os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+    "--disable-gpu "
+    "--disable-gpu-compositing "
+    "--disable-features=VizDisplayCompositor "
+    "--disable-software-rasterizer"
+)
+
+os.environ["QT_OPENGL"] = "software"
+os.environ["QT_QUICK_BACKEND"] = "software"
+os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS",
+    os.environ.get("QTWEBENGINE_CHROMIUM_FLAGS","") + " --log-level=3 --disable-logging"
+)
+# 2) Qt/OpenGL: принудительно software
+os.environ["QT_OPENGL"] = "software"
+
+# (иногда помогает ещё это)
+os.environ["QTWEBENGINE_DISABLE_SANDBOX"] = "1"
+
 # импорт наверху рядом с остальными:
 
 import threading
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin")))
 from dependencies import *
-
-os.environ["QT_OPENGL"] = "software"
-os.environ["QT_QUICK_BACKEND"] = "software"
-
 
 with open("bin/sys/path/path.json", "r", encoding="utf-8") as f:
     path_data = json.load(f)
@@ -390,11 +406,12 @@ class MacOSWindow(QMainWindow):
         self.is_splash_screen_active = False  # Флаг для отслеживания состояния загрузочного экрана
         self.is_password_input_deleted = False
         # Инициализация Wi-Fi
-        self.wifi = pywifi.PyWiFi()
+        self.wifi = None
         self.iface = None
+        self.wifi_available = False
+        self.wifi_error = ""
         self._meta_down = False
         self._meta_combo_used = False
-
 
         self.pinned_apps = set()  # Зберігає id закріплених додатків
 
@@ -416,13 +433,36 @@ class MacOSWindow(QMainWindow):
             print(f"[STYLE] Стиль не завантажено, шлях: {styles_path}")
 
         
+        # try:
+        #     if self.wifi.interfaces():
+        #         self.iface = self.wifi.interfaces()[0]
+        #     else:
+        #         StellarMessageBox.warning(self, self.tr("Error"), self.tr("Error_wifi"))
+        # except Exception as e:
+        #     StellarMessageBox.warning(self, self.tr("Error"), f"Error initialization Wi-Fi: {str(e)}")
         try:
-            if self.wifi.interfaces():
-                self.iface = self.wifi.interfaces()[0]
+            # ✅ Linux: если нет wpa_supplicant — НЕ ПАДАЕМ, просто выключаем Wi-Fi
+            if platform.system().lower() == "linux":
+                if not os.path.exists("/var/run/wpa_supplicant"):
+                    raise FileNotFoundError("/var/run/wpa_supplicant")
+
+            self.wifi = pywifi.PyWiFi()
+            ifaces = self.wifi.interfaces()
+            if ifaces:
+                self.iface = ifaces[0]
+                self.wifi_available = True
             else:
-                StellarMessageBox.warning(self, self.tr("Error"), self.tr("Error_wifi"))
+                self.wifi_available = False
+                self.wifi_error = "No Wi-Fi adapter"
         except Exception as e:
-            StellarMessageBox.warning(self, self.tr("Error"), f"Error initialization Wi-Fi: {str(e)}")
+            self.wifi_available = False
+            self.iface = None
+            self.wifi_error = str(e)
+            print(f"[WIFI] disabled: {self.wifi_error}")
+            # можно показать мягкое предупреждение, но НЕ критическую ошибку:
+            # StellarMessageBox.warning(self, self.tr("Error"), f"Wi-Fi disabled: {self.wifi_error}")
+
+            
         try:
             self.desk_config = files.get("desk.config", "root/user/desk/desk.config")
             self.active_windows = {}
@@ -750,7 +790,7 @@ class MacOSWindow(QMainWindow):
         layout.addWidget(self.volume_button)
 
         # === Виджет громкости ===
-        self.volume_widget = VolumeControlWidget(
+        self.volume_widget = Volume(
             parent=self,
             translator=self.tr,
             lang_code=self.current_language
@@ -1024,7 +1064,7 @@ class MacOSWindow(QMainWindow):
         layout.addWidget(self.time_button)
 
         # === Виджет календаря ===
-        self.calendar_widget = CalendarWidget(
+        self.calendar_widget = Calendar(
             parent=self,
             translator=self.tr,
             lang_code=self.current_language
@@ -1716,7 +1756,7 @@ class MacOSWindow(QMainWindow):
         else:
             # print("Ошибка при обновлении.")
             self.reboot_system()
-    
+
 
     def load_background_image(self):
         """Завантажує фон робочого столу з desk.config (JSON)"""
@@ -2477,6 +2517,29 @@ class MacOSWindow(QMainWindow):
 
         return apps
 
+    def get_app_display_name(self, app_id: str) -> str:
+        """Возвращает красивое имя приложения из apps/local/<id>/config.json, иначе fallback."""
+        if not app_id:
+            return "Win"
+
+        # desktop / системные можно обработать отдельно
+        if app_id == "desktop":
+            return "Desktop"
+
+        config_path = os.path.join("apps", "local", app_id, "config.json")
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    config = json.load(f) or {}
+                name = config.get("name")
+                if isinstance(name, str) and name.strip():
+                    return name.strip()
+            except Exception as e:
+                print(f"Помилка читання {config_path}: {e}")
+
+        return app_id.capitalize()
+
+
 
     def show_menu(self):
         """Показывает меню с анимацией"""
@@ -2584,11 +2647,14 @@ class MacOSWindow(QMainWindow):
         else:
             print(f"Unsupported platform: {system_platform}")
 
-    def update_win_menu(self, window_name):
+    def update_win_menu(self, window_name: str):
+        display = self.get_app_display_name(window_name)
+        self.win_menu.setTitle(display)
+
         """
         Обновляет текст меню "Win" на активное окно и выделяет кнопку в доке.
         """
-        self.win_menu.setTitle(window_name)
+        # self.win_menu.setTitle(window_name)
         
         # Сбрасываем стиль всех кнопок
         for name, (button, _) in self.dock_buttons.items():
@@ -2682,7 +2748,7 @@ class MacOSWindow(QMainWindow):
         def update_wifi_icon_size():
             icon_size = min(btn_w, btn_h) * 0.65  # Іконка займає 55% кнопки
             pixmap = QIcon(
-                os.path.join("bin", "icons", "local_icons", "system", "wifi", "wifi_signal_4.png")
+                os.path.join("bin", "icons", "local_icons", "system", "wifi", "wifi_signal_4_lock.png")
             ).pixmap(int(icon_size), int(icon_size))
             self.wifi_icon.setPixmap(pixmap)
             self.wifi_icon.setGeometry(
@@ -2696,7 +2762,7 @@ class MacOSWindow(QMainWindow):
         layout.addWidget(self.wifi_button)
 
         # === Виджет Wi-Fi ===
-        self.wifi_window = WifiWindow(
+        self.wifi_window = Wifi(
             parent=self,
             translator=self.tr,
             lang_code=self.current_language
@@ -2727,10 +2793,10 @@ class MacOSWindow(QMainWindow):
         """Показывает панель управления Wi-Fi с анимацией"""
         # Обновляем список сетей
         self.wifi_window.scan_networks()
-        
+        # 370 420
         # Устанавливаем начальную позицию (невидимая, за экраном справа)
-        start_pos = QPoint(self.width(), self.height() - 520)
-        end_pos = QPoint(self.width() - 370, self.height() - 520)
+        start_pos = QPoint(self.width(), self.height() - 580)
+        end_pos = QPoint(self.width() - 370, self.height() - 580)
         
         self.wifi_window.move(start_pos)
         self.wifi_window.show()
@@ -3398,10 +3464,12 @@ from PyQt6.QtCore import QTimer
 # --- Проверка статуса установки ---
 def check_installation_status():
     username = get_current_username()
-    install_file = f"root/{username}/user/install"
+
+    install_file = os.path.join(BASE_DIR, "root", username, "user", "install")
     if not os.path.exists(install_file):
-        print("[ERROR] Файл установки не найден:", install_file)
+        # print("[ERROR] Файл установки не найден:", install_file)
         return False
+
     try:
         with open(install_file, "r", encoding="utf-8") as f:
             status = f.read().strip().lower()
@@ -3415,11 +3483,14 @@ def check_installation_status():
         return False
 
 
+
 from bin.sys.class_.creat_user import SetupWizard
 
 
 # --- Основная функция ---
-if __name__ == "__main__":
+# if __name__ == "__main__":
+
+def main():
     if not check_installation_status():
         app = QApplication(sys.argv)
         setup = SetupWizard()
@@ -3454,3 +3525,6 @@ if __name__ == "__main__":
     except Exception as e:
         global_exception_handler(type(e), e, e.__traceback__)
 
+
+if __name__ == "__main__":
+    main()

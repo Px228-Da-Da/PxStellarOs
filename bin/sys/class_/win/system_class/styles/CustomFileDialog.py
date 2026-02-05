@@ -222,6 +222,7 @@ class CustomFileDialog(QDialog):
             }
         """)
         self.path_edit.returnPressed.connect(self.navigate_to_path)
+        self.path_edit.installEventFilter(self)
         
         # Search field
         self.search_edit = CustomLineEdit()
@@ -307,6 +308,8 @@ class CustomFileDialog(QDialog):
         self.file_list.setWordWrap(True)
         self.file_list.setUniformItemSizes(True)
         self.file_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        self.file_list.setVerticalScrollBar(CastScrollBar(Qt.Orientation.Vertical))
+        self.file_list.setHorizontalScrollBar(CastScrollBar(Qt.Orientation.Horizontal))
         self.file_list.setStyleSheet("""
             QListWidget {
                 background-color: rgba(30, 30, 30, 180);
@@ -380,10 +383,14 @@ class CustomFileDialog(QDialog):
         buttons_layout.addStretch()
         
         self.cancel_button = QPushButton(self.tr("Cancel"))
+        self.cancel_button.setAutoDefault(False)
+        self.cancel_button.setDefault(False)
         self.cancel_button.setStyleSheet(self.get_button_style())
         self.cancel_button.clicked.connect(self.reject)
         
         self.open_button = QPushButton(self.tr("Open"))
+        self.open_button.setAutoDefault(False)
+        self.open_button.setDefault(False)
         self.open_button.setStyleSheet(self.get_button_style(primary=True))
         self.open_button.clicked.connect(self.accept_selection)
         
@@ -395,6 +402,14 @@ class CustomFileDialog(QDialog):
         # History for navigation
         self.history = []
         self.history_index = -1
+
+    def eventFilter(self, obj, event):
+        if obj is self.path_edit and event.type() == event.Type.KeyPress:
+            if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                self.navigate_to_path()
+                return True  # ✅ съели Enter, диалог не закроется
+        return super().eventFilter(obj, event)
+
         
     def get_button_style(self, primary=False):
         if primary:

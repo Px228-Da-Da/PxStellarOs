@@ -348,26 +348,103 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame, QTabBar
 )
+from PyQt6.QtWidgets import QStackedWidget, QListWidget, QLineEdit
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEnginePage
-from PyQt6.QtCore import QUrl, Qt, QTimer
 from PyQt6.QtWebChannel import QWebChannel
-import os, sys
+from PyQt6.QtCore import QObject, pyqtSlot, QUrl, Qt, QTimer
+
+from PyQt6.QtGui import QShortcut, QKeySequence
+from PyQt6.QtCore import Qt
+
+
+import sys
+import os
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin")))
 from dependencies import *  # предполагаю, что здесь определён CustomFileDialog, DraggableResizableWindow и т.д.
+
+
 
 
 class CustomWebEnginePage(QWebEnginePage):
     def __init__(self, profile, parent, browser_window):
         super().__init__(profile, parent)
-        self.browser_window = browser_window
+        self.browser_window = browser_window  # VscodeWindow
+
+    # --- helpers ---
+    def _parent_widget(self):
+        # чтобы окно было "внутри твоей ОС/контейнера"
+        return self.browser_window
+
+    def javaScriptAlert(self, securityOrigin: QUrl, msg: str):
+        # alert()
+        try:
+            StellarMessageBox.warning(self._parent_widget(), "JS", msg)
+        except Exception:
+            # запасной вариант
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.warning(self._parent_widget(), "JS", msg)
+
+    def javaScriptConfirm(self, securityOrigin: QUrl, msg: str) -> bool:
+        # confirm()
+
+        # ✅ отключаем надоедливые "leave this page?" (beforeunload)
+        low = (msg or "").lower()
+        if "leave this page" in low or "changes that you made may not be saved" in low:
+            return True  # автоподтверждение без окна
+
+        # Пытаемся показать “в твоём стиле”
+        try:
+            # если у StellarMessageBox есть question() — используем
+            if hasattr(StellarMessageBox, "question"):
+                # ожидаем True/False
+                return bool(StellarMessageBox.question(self._parent_widget(), "JS", msg))
+            # иначе хотя бы warning + OK/Cancel через Qt
+        except Exception:
+            pass
+
+        from PyQt6.QtWidgets import QMessageBox
+        res = QMessageBox.question(
+            self._parent_widget(),
+            "JS",
+            msg,
+            QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel
+        )
+        return res == QMessageBox.StandardButton.Ok
+
+    def javaScriptPrompt(self, securityOrigin: QUrl, msg: str, defaultValue: str):
+        # prompt()
+        try:
+            # если у тебя есть свой диалог ввода — вставь сюда
+            from PyQt6.QtWidgets import QInputDialog
+            text, ok = QInputDialog.getText(self._parent_widget(), "JS", msg, text=defaultValue or "")
+            return (ok, text)
+        except Exception:
+            return (False, defaultValue or "")
 
     # Перехватываем window.open()
     def createWindow(self, web_window_type):
         return self.browser_window.create_new_tab_from_page(web_window_type)
 
-from PyQt6.QtCore import QObject, pyqtSlot
-import os
+class DropForwarder(QObject):
+    def __init__(self, target_window):
+        super().__init__(target_window)
+        self.target = target_window
+
+    def eventFilter(self, obj, event):
+        t = event.type()
+        if t in (QEvent.Type.DragEnter, QEvent.Type.DragMove, QEvent.Type.Drop):
+            md = event.mimeData()
+            if md and md.hasUrls():
+                if t == QEvent.Type.DragEnter:
+                    self.target.dragEnterEvent(event)
+                elif t == QEvent.Type.DragMove:
+                    self.target.dragMoveEvent(event)
+                else:
+                    self.target.dropEvent(event)
+                return True
+        return False
 
 class Bridge(QObject):
     def __init__(self, parent=None, editor_window=None):
@@ -390,6 +467,9 @@ class Bridge(QObject):
             return
         path = os.path.join(self.current_folder, filename)
         if not os.path.exists(path):
+            return
+        if os.path.isdir(path):
+            self.open_folder(path)
             return
 
         # Проверяем, не открыт ли файл уже
@@ -430,31 +510,38 @@ class Bridge(QObject):
         self.open_folder(self.current_folder)
 
 
-    @pyqtSlot(str)
-    def open_folder(self, path=None):
+    @pyqtSlot()
+    def open_folder(self):
         from PyQt6.QtWidgets import QFileDialog
-        if not path:
-            path = QFileDialog.getExistingDirectory(None, "Select Project Folder")
+        path = QFileDialog.getExistingDirectory(None, "Select Project Folder")
         if path:
-            self.current_folder = path
-            entries = []
-            for name in os.listdir(path):
-                full = os.path.join(path, name)
-                if os.path.isdir(full):
-                    entries.append({"name": name, "type": "folder"})
-                else:
-                    entries.append({"name": name, "type": "file"})
-            # передаём в JS
-            self.editor_window.browser.page().runJavaScript(f"loadProjectFiles({entries}, {repr(path)});")
+            self._open_folder_impl(path)
 
-import json
-import os
-import sys
+    @pyqtSlot(str)
+    def open_folder_path(self, path: str):
+        if path:
+            self._open_folder_impl(path)
+
+    def _open_folder_impl(self, path: str):
+        self.current_folder = path
+        entries = []
+        for name in os.listdir(path):
+            full = os.path.join(path, name)
+            if os.path.isdir(full):
+                entries.append({"name": name, "type": "folder"})
+            else:
+                entries.append({"name": name, "type": "file"})
+
+        payload = json.dumps(entries, ensure_ascii=False)
+        path_js = json.dumps(path, ensure_ascii=False)
+
+        self.editor_window.browser.page().runJavaScript(
+            f"loadProjectFiles({payload}, {path_js});"
+        )
+
 
 BASE_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
-
 USER_CONFIG_PATH = os.path.join(BASE_DIR, 'root', 'bin', 'user.config')
-
 
 def get_current_username():
     """
@@ -502,8 +589,15 @@ class VscodeWindow(DraggableResizableWindow):
         self.setWindowTitle(self.tr("VSCode (Monaco)"))
         self.setGeometry(300, 150, 1000, 700)
 
+        self.username = get_current_username()
+        self.projects_db = os.path.join(os.getcwd(), "root", f"{self.username}", "vscode_projects.json")
+        os.makedirs(os.path.dirname(self.projects_db), exist_ok=True)
+        self.setAttribute(Qt.WidgetAttribute.WA_AcceptDrops, True)
+
         # Центральный контейнер
         self.container = QWidget(self)
+        self.setAcceptDrops(True)
+        self.container.setAcceptDrops(True)
         self.set_content(self.container)
         layout = QVBoxLayout(self.container)
         self.container.setLayout(layout)
@@ -512,12 +606,14 @@ class VscodeWindow(DraggableResizableWindow):
         self.new_btn = QPushButton("New")
         self.open_btn = QPushButton("Open")
         self.save_btn = QPushButton("Save")
+        self.run_btn  = QPushButton("Run")   # ✅ добавили
 
         self.new_btn.clicked.connect(self.new_file)
         self.open_btn.clicked.connect(self.open_file)
         self.save_btn.clicked.connect(self.save_file)
+        self.run_btn.clicked.connect(self.run_current)  # ✅ добавили
 
-        for btn in [self.new_btn, self.open_btn, self.save_btn]:
+        for btn in [self.new_btn, self.open_btn, self.save_btn, self.run_btn]:
             btn.setStyleSheet("""
                 QPushButton {
                     padding: 6px 14px;
@@ -531,27 +627,35 @@ class VscodeWindow(DraggableResizableWindow):
             """)
             self.add_title_widget(btn)
 
+        # ✅ для предпросмотра (чтобы закрывать прошлое окно)
+        self._hs_preview_window = None
+
+        # ✅ F5 = Run (не зависимо от фокуса в браузере)
+        self.sc_run_hs = QShortcut(QKeySequence(Qt.Key.Key_F5), self)
+        self.sc_run_hs.setContext(Qt.ShortcutContext.ApplicationShortcut)
+        self.sc_run_hs.activated.connect(self.run_current)
+
         # === TabBar для файлов (PyQt) ===
         self.tab_bar = QTabBar()
         self.tab_bar.setTabsClosable(True)
         self.tab_bar.tabCloseRequested.connect(self.close_tab)
         self.tab_bar.currentChanged.connect(self.switch_tab)
+        # layout.addWidget(self.tab_bar)
         layout.addWidget(self.tab_bar)
-
-        # Разделитель
-        separator = QFrame()
-        separator.setFrameShape(QFrame.Shape.HLine)
-        separator.setFrameShadow(QFrame.Shadow.Sunken)
-        layout.addWidget(separator)
-        self.username = get_current_username()
 
         # === Monaco Editor (QWebEngineView) ===
         self.browser = QWebEngineView()
+        # Чтобы QWebEngineView не перехватывал drop — пусть событие дойдёт до окна.
+        self.browser.setAcceptDrops(False)
+        self._monaco_loaded = False
+        self._pending_open = None  # (text, language)
+        self.browser.loadFinished.connect(self._on_monaco_loaded)
         html_path = os.path.abspath(os.path.join("apps", "local", "Vscode", "monaco", "index.html"))
         if not os.path.exists(html_path):
             print("❌ Не найден index.html:", html_path)
         else:
-            print("✅ Загружаем Monaco:", html_path)
+            # print("✅ Загружаем Monaco:", html_path)
+            pass
 
         # Настраиваем профиль (путь для кеша и storage)
         self.profile = QWebEngineProfile("VscodeProfile", self)
@@ -574,8 +678,53 @@ class VscodeWindow(DraggableResizableWindow):
         # потом уже загружаем HTML
         self.browser.setUrl(QUrl.fromLocalFile(html_path))
 
-        self.browser.setUrl(QUrl.fromLocalFile(html_path))
-        layout.addWidget(self.browser)
+        # self.browser.setUrl(QUrl.fromLocalFile(html_path))
+        # layout.addWidget(self.browser)
+
+        # --- STACK: стартовый экран / редактор ---
+        self.stack = QStackedWidget()
+        layout.addWidget(self.stack)
+
+        # 1) Стартовый экран проектов
+        self.start_page = QWidget()
+        self._build_start_page(self.start_page)
+        self.stack.addWidget(self.start_page)
+
+        # 2) Страница редактора (Monaco)
+        self.editor_page = QWidget()
+        editor_layout = QVBoxLayout(self.editor_page)
+        editor_layout.setContentsMargins(0, 0, 0, 0)
+        editor_layout.setSpacing(0)
+
+        # --- Enable drops on top widgets (stack/pages), иначе курсор будет 🚫 ---
+        for w in (self.stack, self.start_page, self.editor_page, self.tab_bar):
+            w.setAcceptDrops(True)
+            w.setAttribute(Qt.WidgetAttribute.WA_AcceptDrops, True)
+
+        # --- Forward drag/drop from stack pages to window handlers ---
+        self._drop_forwarder = DropForwarder(self)
+        self.stack.installEventFilter(self._drop_forwarder)
+        self.start_page.installEventFilter(self._drop_forwarder)
+        self.editor_page.installEventFilter(self._drop_forwarder)
+        self.tab_bar.installEventFilter(self._drop_forwarder)
+
+
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        editor_layout.addWidget(self.browser)
+        self.stack.addWidget(self.editor_page)
+
+        # Показать сначала проекты
+        self.stack.setCurrentWidget(self.start_page)
+
+
+        # Разделитель
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setFrameShadow(QFrame.Shadow.Sunken)
+        layout.addWidget(separator)
+
 
         # === Статус-бар PyQt (информативно) ===
         self.tab_bar.setStyleSheet("""
@@ -633,6 +782,44 @@ class VscodeWindow(DraggableResizableWindow):
         """Установка текста в редактор (основной метод)"""
         self.set_text_safe(text, language)
 
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event):
+        md = event.mimeData()
+        if not md.hasUrls():
+            event.ignore()
+            return
+
+        paths = []
+        for url in md.urls():
+            p = url.toLocalFile()
+            if p:
+                paths.append(os.path.abspath(p))
+
+        folders = [p for p in paths if os.path.isdir(p)]
+        files   = [p for p in paths if os.path.isfile(p)]
+
+        if folders and hasattr(self, "open_project"):
+            self.open_project(folders[0])
+
+        for fp in files:
+            # у тебя есть create_tab(title, path)
+            self.create_tab(title=os.path.basename(fp), path=fp)
+
+        event.acceptProposedAction()
+
+
+
     def get_text(self, callback):
         js = """
         (function waitForEditor() {
@@ -644,6 +831,182 @@ class VscodeWindow(DraggableResizableWindow):
         })();
         """
         self.browser.page().runJavaScript(js, callback)
+
+    def _load_projects(self):
+        try:
+            if os.path.exists(self.projects_db):
+                with open(self.projects_db, "r", encoding="utf-8") as f:
+                    data = json.load(f) or []
+                # оставляем только существующие папки
+                return [p for p in data if isinstance(p, str) and os.path.isdir(p)]
+        except Exception as e:
+            print("[VSCODE] projects db read error:", e)
+        return []
+
+    def _save_projects(self, projects: list[str]):
+        try:
+            with open(self.projects_db, "w", encoding="utf-8") as f:
+                json.dump(projects[:30], f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print("[VSCODE] projects db save error:", e)
+
+    def _on_monaco_loaded(self, ok: bool):
+        self._monaco_loaded = bool(ok)
+        if not ok:
+            return
+
+        # если был запрос открыть файл пока Monaco грузился — применяем
+        if self._pending_open:
+            text, lang = self._pending_open
+            self._pending_open = None
+            QTimer.singleShot(0, lambda: self.set_text_safe(text, lang))
+
+
+    def _add_recent_project(self, path: str):
+        path = os.path.abspath(path)
+        projects = self._load_projects()
+        if path in projects:
+            projects.remove(path)
+        projects.insert(0, path)
+        self._save_projects(projects)
+        self._refresh_projects_list()
+
+    def _build_start_page(self, page: QWidget):
+        lay = QVBoxLayout(page)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(10)
+
+        title = QLabel("Projects")
+        title.setStyleSheet("color: white; font-size: 18px; font-weight: 600;")
+        lay.addWidget(title)
+
+        self.projects_list = QListWidget()
+        self.projects_list.setStyleSheet("""
+            QListWidget { background: #1e1e1e; color: #ddd; border: 1px solid #333; }
+            QListWidget::item { padding: 8px; }
+            QListWidget::item:selected { background: #2a2a2a; }
+        """)
+        self.projects_list.itemDoubleClicked.connect(lambda _: self.open_selected_project())
+        lay.addWidget(self.projects_list, 1)
+
+        # Create project
+        row = QHBoxLayout()
+        self.new_project_name = Input(
+            parent=self,
+            translator=self.tr,
+            lang_code=getattr(self, "Project name…", "en")
+        )
+        self.new_project_name.setPlaceholderText("Project name…")
+        self.new_project_name.setStyleSheet("padding: 6px; background:#111; color:#ddd; border:1px solid #333;")
+        row.addWidget(self.new_project_name, 1)
+
+        btn_create = QPushButton("Create")
+        btn_open = QPushButton("Open existing…")
+        btn_add = QPushButton("Add to list…")
+
+        for b in (btn_create, btn_open, btn_add):
+            b.setStyleSheet("""
+                QPushButton{ padding: 6px 12px; border-radius: 6px; background:#2196F3; color:white; border:none; }
+                QPushButton:hover{ background:#1976D2; }
+                QPushButton:pressed{ background:#1565C0; }
+            """)
+
+        btn_create.clicked.connect(self.create_project)
+        btn_open.clicked.connect(self.open_project_dialog)
+        btn_add.clicked.connect(self.add_project_dialog)
+
+        row.addWidget(btn_create)
+        row.addWidget(btn_open)
+        row.addWidget(btn_add)
+        lay.addLayout(row)
+
+        btn_open_sel = QPushButton("Open selected")
+        btn_open_sel.setStyleSheet("""
+            QPushButton{ padding: 8px 12px; border-radius: 8px; background:#3c3c3c; color:#ddd; border:1px solid #444; }
+            QPushButton:hover{ background:#444; }
+        """)
+        btn_open_sel.clicked.connect(self.open_selected_project)
+        lay.addWidget(btn_open_sel)
+
+        self._refresh_projects_list()
+
+    def _refresh_projects_list(self):
+        self.projects_list.clear()
+        for p in self._load_projects():
+            self.projects_list.addItem(p)
+
+    def open_selected_project(self):
+        item = self.projects_list.currentItem()
+        if not item:
+            return
+        self.open_project(item.text())
+
+    def open_project(self, path: str):
+        if not os.path.isdir(path):
+            return
+        self._add_recent_project(path)
+
+        # передаём в bridge и грузим дерево
+        try:
+            self.bridge.open_folder_path(path)  # у тебя уже есть :contentReference[oaicite:3]{index=3}
+        except Exception as e:
+            print("[VSCODE] open_folder error:", e)
+
+        # показываем редактор
+        self.stack.setCurrentWidget(self.editor_page)
+        self.setWindowTitle(f"VSCode (Monaco) — {os.path.basename(path)}")
+
+    def open_project_dialog(self):
+        from PyQt6.QtWidgets import QFileDialog
+        path = QFileDialog.getExistingDirectory(None, "Select Project Folder")
+        if path:
+            self.open_project(path)
+
+    def add_project_dialog(self):
+        # почти как open_project_dialog, но не переключаемся — только добавляем
+        from PyQt6.QtWidgets import QFileDialog
+        path = QFileDialog.getExistingDirectory(None, "Add Project Folder")
+        if path:
+            self._add_recent_project(path)
+
+    def create_project(self):
+        name = (self.new_project_name.text() or "").strip()
+        if not name:
+            return
+
+        # куда создавать: root/<user>/projects/<name>
+        base = os.path.join(os.getcwd(), "root", f"{self.username}", "projects")
+        os.makedirs(base, exist_ok=True)
+
+        proj = os.path.join(base, name)
+        os.makedirs(proj, exist_ok=True)
+
+        # минимальный шаблон для твоей ОС
+        # (позже ты заменишь на DSL-template)
+        app_dir = os.path.join(proj, name)
+        os.makedirs(app_dir, exist_ok=True)
+
+        cfg = os.path.join(app_dir, "config.json")
+        if not os.path.exists(cfg):
+            with open(cfg, "w", encoding="utf-8") as f:
+                json.dump({"name": name}, f, ensure_ascii=False, indent=2)
+
+        main_hs = os.path.join(app_dir, "main.hs")
+        if not os.path.exists(main_hs):
+            with open(main_hs, "w", encoding="utf-8") as f:
+                f.write(
+                    f'app "{name}" size(520, 300)\n\n'
+                    'namber = Input(lang_code="current_language", placeholder_text="input namber")\n'
+                    'title  = Label(text="Type number:")\n'
+                    'btn    = Button(text="Show")\n\n'
+                    'add(title)\n'
+                    'add(namber)\n'
+                    'add(btn)\n'
+                )
+
+
+        self.open_project(proj)
+
 
     # === Управление вкладками ===
     # def create_tab(self, title: str = None, path: str = None, content: str = None, language: str = "plaintext"):
@@ -681,7 +1044,10 @@ class VscodeWindow(DraggableResizableWindow):
 
     #     # обновим HTML-статусбар кодировку (если нужно)
     #     self.browser.page().runJavaScript(f"window.setEncoding({repr('UTF-8')});")
-    def create_tab(self, title: str = None, path: str = None, content: str = None, language: str = "plaintext"):
+    def create_tab(self, title: str = None, path: str = None, content: str = None, language: str | None = None):
+        # показать редактор, если открываем файл
+        if hasattr(self, "stack") and hasattr(self, "editor_page"):
+            self.stack.setCurrentWidget(self.editor_page)
         if title is None:
             if path:
                 title = os.path.basename(path)
@@ -707,8 +1073,12 @@ class VscodeWindow(DraggableResizableWindow):
             content = ""
 
         # если язык не указан и есть путь — определяем
-        if not language and path:
-            language = self.detect_language(path)
+        # ✅ язык определяем всегда по расширению, если открываем файл
+        if path:
+            detected = self.detect_language(path)
+            if (language is None) or (language == "plaintext"):
+                language = detected
+
 
         # Сохраняем данные для текущей вкладки
         self.current_file = path
@@ -725,7 +1095,7 @@ class VscodeWindow(DraggableResizableWindow):
             
             # обновим HTML-статусбар кодировку
             self.browser.page().runJavaScript(f"window.setEncoding({repr('UTF-8')});")
-            print(f"✅ Content loaded for: {self.current_file}")
+            # print(f"✅ Content loaded for: {self.current_file}")
 
     def new_file(self):
         # Создаём пустую вкладку без привязки к файлу
@@ -738,20 +1108,27 @@ class VscodeWindow(DraggableResizableWindow):
             self,
             self.tr("Open File"),
             "",
-            "All Files (*);;Text Files (*.txt);;Python (*.py);;JavaScript (*.js);;HTML (*.html);;CSS (*.css);;JSON (*.json)"
+            "All Files (*);;Hitti Script (*.hs);;Text Files (*.txt);;Python (*.py);;JavaScript (*.js);;HTML (*.html);;CSS (*.css);;JSON (*.json)"
         )
         if not file_path:
             return
 
-        # Если уже открыт — просто переключаемся
+        # ✅ ВАЖНО: если выбрали папку — не открываем как файл
+        if os.path.isdir(file_path):
+            # вариант 1: открыть как проект
+            self.open_project(file_path)
+            return
+            # вариант 2: просто return (если не хочешь открывать как проект)
+
+        # дальше твой текущий код открытия файла...
         if file_path in self.open_files:
             idx = self.open_files.index(file_path)
             self.tab_bar.setCurrentIndex(idx)
             self.switch_tab(idx)
             return
 
-        # Иначе создаём новую вкладку и загружаем
         self.create_tab(title=os.path.basename(file_path), path=file_path)
+
 
     def save_file(self):
         """Сохраняем текст из Monaco в файл (если вкладка была Untitled — спросим путь)"""
@@ -825,6 +1202,7 @@ class VscodeWindow(DraggableResizableWindow):
         
         mapping = {
             ".py": "python",
+            ".hs": "HittiScript",
             ".js": "javascript",
             ".jsx": "javascript",
             ".ts": "typescript",
@@ -887,6 +1265,8 @@ class VscodeWindow(DraggableResizableWindow):
     #         self.current_file = None
     #         # self.status_label.setText("    New file")
     def switch_tab(self, index):
+        if hasattr(self, "stack") and hasattr(self, "editor_page"):
+            self.stack.setCurrentWidget(self.editor_page)
         if index < 0 or index >= len(self.open_files):
             return
             
@@ -967,17 +1347,27 @@ class VscodeWindow(DraggableResizableWindow):
         self.browser.page().runJavaScript(js_check, handle_result)
 
     def set_text_safe(self, text: str, language: str = "plaintext"):
+        if not getattr(self, "_monaco_loaded", False):
+            self._pending_open = (text, language)
+            return
         """Безопасная установка текста с ожиданием готовности редактора"""
         def set_text():
             js = f"""
-            (function() {{
-                if (typeof window.setValueWithLanguage === 'function') {{
-                    window.setValueWithLanguage({repr(text)}, {repr(language)});
-                    return true;
-                }}
-                return false;
-            }})();
+                (function() {{
+                    if (typeof window.setValueWithLanguage === 'function') {{
+                        window.setValueWithLanguage({repr(text)}, {repr(language)});
+                        if (window.editor) {{
+                            window.editor.layout();
+                            if (typeof window.editor.render === 'function') window.editor.render();
+                            setTimeout(() => window.editor && window.editor.layout(), 0);
+                            setTimeout(() => window.editor && window.editor.layout(), 50);
+                        }}
+                        return true;
+                    }}
+                    return false;
+                }})();
             """
+
             
             def handle_set_result(result):
                 if not result:
@@ -1008,3 +1398,123 @@ class VscodeWindow(DraggableResizableWindow):
         }})();
         """
         self.browser.page().runJavaScript(js)
+
+    def run_current(self):
+        """Run текущего .hs: сохраняем, парсим DSL и показываем окно."""
+        idx = self.tab_bar.currentIndex()
+        if idx < 0 or idx >= len(self.open_files):
+            return
+
+        path = self.open_files[idx]
+
+        # если файл не сохранён — спросим путь
+        def after_saved(file_path: str, code: str):
+            if not file_path.lower().endswith(".hs"):
+                StellarMessageBox.warning(self, self.tr("Run"), "Run работает только для .hs файлов.")
+                return
+            self._run_hs_code(code)
+
+        self._save_current_for_run(after_saved)
+
+
+    def _save_current_for_run(self, done_cb):
+        """Сохраняет текущий файл и возвращает (path, code) в done_cb."""
+        import os
+
+        def handle_code(code: str):
+            idx = self.tab_bar.currentIndex()
+            if idx < 0 or idx >= len(self.open_files):
+                return
+
+            current_path = self.open_files[idx]
+
+            # если вкладка без пути — спросим путь
+            if not current_path:
+                file_path, _ = CustomFileDialog.getSaveFileName(
+                    self,
+                    self.tr("Save File"),
+                    "",
+                    "HittiScript (*.hs);All Files (*)"
+                )
+                if not file_path:
+                    return
+                if not file_path.lower().endswith(".hs"):
+                    file_path += ".hs"
+
+                self.open_files[idx] = file_path
+                self.tab_bar.setTabText(idx, os.path.basename(file_path))
+                current_path = file_path
+
+            try:
+                with open(current_path, "w", encoding="utf-8") as f:
+                    f.write(code)
+                self.current_file = current_path
+                try:
+                    self.browser.page().runJavaScript(f"window.setEncoding({repr('UTF-8')});")
+                except Exception:
+                    pass
+                done_cb(current_path, code)
+            except Exception as e:
+                StellarMessageBox.warning(self, self.tr("Save error"), str(e))
+
+        self.get_text(handle_code)
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        QTimer.singleShot(0, lambda: self.browser.page().runJavaScript(
+            "if(window.editor){window.editor.layout();}"
+        ))
+
+    def _run_hs_code(self, code: str):
+        """Парсит DSL (dsl_v1.py) и показывает окно внутри твоей ОС (насколько возможно)."""
+        import os, sys, traceback, importlib.util
+
+        # закрываем прошлый предпросмотр
+        try:
+            if self._hs_preview_window is not None:
+                self._hs_preview_window.close()
+        except Exception:
+            pass
+        self._hs_preview_window = None
+
+        try:
+            # ✅ добавляем системные пути (чтобы dsl_v1 импортнул init/styles из системы)
+            base = os.getcwd()
+            sys_paths = [
+                os.path.join(base, "bin"),
+                os.path.join(base, "bin", "sys", "class_", "win"),
+                os.path.join(base, "bin", "sys", "class_", "win", "system_class"),
+            ]
+            for p in sys_paths:
+                if p not in sys.path:
+                    sys.path.insert(0, p)
+
+            # ✅ HittiScript движок из системы: bin/sys/HittiScript/dsl_v1.py
+            base = os.getcwd()  # корень PxStellarOs
+            dsl_path = os.path.join(base, "bin", "sys", "HittiScript", "dsl_v1.py")
+            if not os.path.exists(dsl_path):
+                raise FileNotFoundError(f"Не найден HittiScript движок: {dsl_path}")
+
+
+            spec = importlib.util.spec_from_file_location("stellar_dsl_v1", dsl_path)
+            mod = importlib.util.module_from_spec(spec)
+            assert spec and spec.loader
+            spec.loader.exec_module(mod)
+
+            app_spec, widget_specs, layout_cmds, actions = mod.parse_hs(code)
+            win = mod.build_app(app_spec, widget_specs, layout_cmds, actions)
+
+            # ✅ попытка “встроить” в твою ОС: делаем parent как у окна Vscode
+            try:
+                if hasattr(self, "parent_window") and self.parent_window is not None:
+                    win.setParent(self.parent_window)
+                    if hasattr(win, "parent_window"):
+                        win.parent_window = self.parent_window
+            except Exception:
+                pass
+
+            win.show()
+            self._hs_preview_window = win
+
+        except Exception:
+            StellarMessageBox.warning(self, self.tr("DSL error"), traceback.format_exc())

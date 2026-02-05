@@ -1,4 +1,5 @@
 from PyQt6.QtWidgets import QScrollBar
+from PyQt6.QtGui import QContextMenuEvent
 from PyQt6.QtCore import Qt
 
 class CastScrollBar(QScrollBar):
@@ -50,7 +51,7 @@ class CastScrollBar(QScrollBar):
 
             QScrollBar:horizontal {
                 border: none;
-                background: #f0f0f0;
+                background: #3a3a3a;
                 height: 12px;
                 margin: 0 16px 0 16px;
                 border-radius: 6px;
@@ -85,3 +86,8 @@ class CastScrollBar(QScrollBar):
                 background: none;
             }
         """)
+
+    def contextMenuEvent(self, event: QContextMenuEvent):
+        # Запретить стандартное меню по ПКМ
+        event.accept()
+        return

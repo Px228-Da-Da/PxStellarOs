@@ -8,6 +8,47 @@ from updater import get_current_version, get_latest_version, update_application,
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "bin")))
 from dependencies import *
 
+import json
+import os
+import sys
+
+BASE_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
+
+USER_CONFIG_PATH = os.path.join(BASE_DIR, 'root', 'bin', 'user.config')
+
+
+def get_current_username():
+    """
+    Читает user.config, выводит имя пользователя в системную консоль и возвращает его.
+    """
+    username = "Unknown User"
+    
+    try:
+        # Проверяем существование файла
+        if not os.path.exists(USER_CONFIG_PATH):
+            error_msg = f"[ERROR] user.config not found. Expected path: {USER_CONFIG_PATH}"
+            print(error_msg)
+            return "Error: File not found"
+            
+        with open(USER_CONFIG_PATH, 'r', encoding='utf-8') as f:
+            config_data = json.load(f)
+            # Извлекаем имя пользователя
+            username = config_data.get("user_name", "Unknown User (key missing)")
+            
+    except json.JSONDecodeError:
+        error_msg = "[ERROR] Invalid JSON format in user.config."
+        print(error_msg)
+        username = "Error: Invalid JSON"
+    except Exception as e:
+        error_msg = f"[ERROR] Error reading user data: {e}"
+        print(error_msg)
+        username = "Error: General Exception"
+
+    # 🟢 Вывод имени пользователя прямо в системную консоль (CMD)
+    print(f"[INFO] Current User Name: {username}")
+    
+    return username
+# get_current_username()
 
 class SettingsWindow(DraggableResizableWindow):
     def __init__(self, parent=None, window_name="", translator=None, lang_code="en"):
@@ -978,8 +1019,9 @@ class SettingsWindow(DraggableResizableWindow):
         self.hide()
 
     def save_new_password(self):
-        """Змінює пароль у файлі root/dataLacmi/user/password"""
-        password_file = os.path.join("root", "dataLacmi", "user", "password")
+        """Змінює пароль у файлі root/{username}/user/password"""
+        username = get_current_username()
+        password_file = os.path.join("root", f"{username}", "user", "password")
 
         old_pass = self.old_password_input.text().strip()
         new_pass = self.new_password_input.text().strip()

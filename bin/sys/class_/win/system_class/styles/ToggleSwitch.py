@@ -8,7 +8,7 @@ from dependencies import *
 class ToggleSwitch(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedSize(60, 30)
+        self.setFixedSize(30, 20)
         self._checked = True
         self._circle_position = self.width() - self.height() + 2
 
@@ -23,7 +23,13 @@ class ToggleSwitch(QWidget):
             self.animation.setEndValue(2)
         self.animation.start()
         self.update()
-        self.parent().toggle_wifi(self._checked)
+        # безопасно ищем родителя с методом toggle_wifi
+        p = self.parent()
+        while p is not None:
+            if hasattr(p, "toggle_wifi"):
+                p.toggle_wifi(self._checked)
+                break
+            p = p.parent()
 
     def paintEvent(self, event):
         radius = self.height() // 2
@@ -41,7 +47,7 @@ class ToggleSwitch(QWidget):
         painter.drawEllipse(QRect(int(self._circle_position), 2, self.height() - 4, self.height() - 4))
 
     def sizeHint(self):
-        return QSize(60, 30)
+        return QSize(30, 20)
 
     def isChecked(self):
         return self._checked

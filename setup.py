@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QMessageBox,
 )
-
+import run
 from PyQt6.QtCore import Qt
 
 LOG_PATH = "boot_error.log"
@@ -36,15 +36,7 @@ def run_setup():
         early_log("[BOOT] Запуск setup.py...", True)
 
         # 🔹 Запуск run.py
-        process = subprocess.Popen(
-            [sys.executable, "run.py"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-            encoding="utf-8",
-            errors="replace"
-        )
+        process = run.main()
 
         output_lines = []
         for line in process.stdout:

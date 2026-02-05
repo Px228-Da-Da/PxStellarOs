@@ -138,7 +138,7 @@ class Manager_allWindow(DraggableResizableWindow):
 
         # Set window properties
         self.setWindowTitle(self.tr("Manager"))
-        self.setGeometry(200, 100, 800, 600)
+        self.setGeometry(200, 100, 900, 600)
 
         # Create a container widget for our content
         self.container = QWidget()
@@ -1078,3 +1078,9 @@ class Manager_allWindow(DraggableResizableWindow):
         container_height = rows * (self.card_height + self.spacing) + self.spacing
         self.updates_container.setMinimumSize(container_width, container_height)
         self.updates_container.adjustSize()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        # После показа окна размеры уже корректные
+        QTimer.singleShot(0, self.update_apps_layout)
+        QTimer.singleShot(0, self.update_updates_layout)

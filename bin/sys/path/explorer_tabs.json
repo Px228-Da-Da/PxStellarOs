@@ -1,0 +1,51 @@
+{
+  "active": 2,
+  "tabs": [
+    {
+      "path": "root/user/images",
+      "history": [
+        "root/user/desk\\bin\\test\\archive",
+        "root/user/images",
+        "root/user/desk"
+      ],
+      "history_index": 1,
+      "archive_mode": false,
+      "archive_path": "",
+      "archive_prefix": ""
+    },
+    {
+      "path": "root/user/desk\\bin\\test\\archive",
+      "history": [
+        "root",
+        "root/user/Documents",
+        "root",
+        "root/user/desk",
+        "root/user/desk\\bin",
+        "root/user/desk\\bin\\test",
+        "root/user/desk\\bin\\test\\archive",
+        "root/user/desk\\bin\\test\\archive\\dvsr",
+        "root/user/desk\\bin\\test\\archive",
+        "/",
+        ".",
+        ".\\apps",
+        ".\\apps\\local",
+        ".\\apps\\local\\Youtubemusic",
+        ".\\apps\\local\\Youtubemusic\\__pycache__"
+      ],
+      "history_index": 8,
+      "archive_mode": false,
+      "archive_path": "",
+      "archive_prefix": ""
+    },
+    {
+      "path": "root\\user\\download",
+      "history": [
+        "root\\user\\download"
+      ],
+      "history_index": 0,
+      "archive_mode": false,
+      "archive_path": "",
+      "archive_prefix": ""
+    }
+  ]
+}

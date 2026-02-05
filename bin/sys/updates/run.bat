@@ -1,0 +1,19 @@
+py -m PyInstaller setup.py ^
+  --name StellarOS ^
+  --clean ^
+  --onedir ^
+  --hidden-import pywifi ^
+  --hidden-import pywifi.const ^
+  --hidden-import requests ^
+  --hidden-import psutil ^
+  --hidden-import comtypes ^
+  --hidden-import pycaw ^
+  --hidden-import pycaw.pycaw ^
+  --hidden-import PyQt6 ^
+  --hidden-import PyQt6.QtWidgets ^
+  --hidden-import PyQt6.QtGui ^
+  --hidden-import PyQt6.QtCore ^
+  --hidden-import PyQt6.QtWebEngineWidgets ^
+  --add-data "run.py;." ^
+  --add-data "apps;apps" ^
+  --add-data "bin;bin"

@@ -59,7 +59,8 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 
-# install_dependencies()
+
+
 
 # | Символ  | Заміна      |
 # | ------  | ----------- |
@@ -85,12 +86,64 @@ import shutil
 import psutil
 import hmac
 
+BASE_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
+USER_CONFIG_PATH = os.path.join(BASE_DIR, 'root', 'bin', 'user.config')
+def get_current_username():
+    """
+    Читает user.config, выводит имя пользователя в системную консоль и возвращает его.
+    """
+    username = "Unknown User"
+    
+    try:
+        # Проверяем существование файла
+        if not os.path.exists(USER_CONFIG_PATH):
+            error_msg = f"[ERROR] user.config not found. Expected path: {USER_CONFIG_PATH}"
+            print(error_msg)
+            return "Error: File not found"
+            
+        with open(USER_CONFIG_PATH, 'r', encoding='utf-8') as f:
+            config_data = json.load(f)
+            # Извлекаем имя пользователя
+            username = config_data.get("user_name", "Unknown User (key missing)")
+            
+    except json.JSONDecodeError:
+        error_msg = "[ERROR] Invalid JSON format in user.config."
+        print(error_msg)
+        username = "Error: Invalid JSON"
+    except Exception as e:
+        error_msg = f"[ERROR] Error reading user data: {e}"
+        print(error_msg)
+        username = "Error: General Exception"
+
+    # 🟢 Вывод имени пользователя прямо в системную консоль (CMD)
+    print(f"[INFO] Current User Name: {username}")
+    
+    return username
+
+username = get_current_username()
+
+def should_skip_install_dependencies(username: str) -> bool:
+    flag_path = os.path.join("root", username, "user", "install")
+    try:
+        if os.path.exists(flag_path):
+            with open(flag_path, "r", encoding="utf-8") as f:
+                return f.read().strip().lower() == "yes"
+    except Exception as e:
+        print(f"[INSTALL] Не удалось прочитать флаг {flag_path}: {e}")
+    return False
+
+
+
 # Условные импорты для Windows
 if platform.system() == "Windows":
     from ctypes import cast, POINTER
     from comtypes import CLSCTX_ALL
     from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 else:
+    if not should_skip_install_dependencies(username):
+        install_dependencies()
+    else:
+        print("[INSTALL] install_dependencies() пропущено (root/<user>/user/install = yes)")
     # Альтернативные импорты для Linux
     import pulsectl  # Для управления звуком
 
@@ -120,7 +173,8 @@ from PyQt6.QtGui import QShortcut, QKeySequence
 # from PyQt6.QtCore import 
 # from PyQt6.QtGui import QColor, 
 # from PyQt6.QtCore import 
-
+import importlib, traceback
+from PyQt6.QtCore import QObject, pyqtSignal, QRunnable, QThreadPool, QTimer
 
 
 from bin.sys.class_.win.init import DraggableResizableWindow
@@ -128,6 +182,7 @@ from bin.sys.class_.win.init import DraggableResizableWindow
 
 from bin.sys.path.path_loader import setup_sys_path  # Инициализация путей
 
+from bin.sys.web.profile import get_shared_profile
 
 from TerminalApp import TerminalApp
 
@@ -151,10 +206,10 @@ from CustomFileDialog import CustomFileDialog
 from ComboBox import ComboBox
 
 
-from CalendarWidget import CalendarWidget
-from VolumeControlWidget import VolumeControlWidget
-from WifiWindow import WifiWindow
-from LinuxStartMenu import LinuxStartMenu
+from Calendar import Calendar
+from Volume import Volume
+from Wifi import Wifi
+# from LinuxStartMenu import LinuxStartMenu
 
 
 def get_local_apps_list():
